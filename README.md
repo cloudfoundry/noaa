@@ -2,6 +2,7 @@ NOAA
 ====
 
 [![Build Status](https://travis-ci.org/cloudfoundry/noaa.svg?branch=master)](https://travis-ci.org/cloudfoundry/noaa)
+[![Coverage Status](https://coveralls.io/repos/cloudfoundry/noaa/badge.png)](https://coveralls.io/r/cloudfoundry/noaa)
 [![GoDoc](https://godoc.org/github.com/cloudfoundry/noaa?status.png)](https://godoc.org/github.com/cloudfoundry/noaa)
 
 NOAA is a client library to consume metric and log messages from Doppler.
