@@ -13,6 +13,7 @@ var authToken = os.Getenv("CF_ACCESS_TOKEN")
 
 func main() {
 	connection := noaa.NewNoaa(DopplerAddress, &tls.Config{InsecureSkipVerify: true}, nil)
+	connection.SetDebugPrinter(ConsoleDebugPrinter{})
 
 	messages, err := connection.RecentLogs(appGuid, authToken)
 
@@ -36,3 +37,11 @@ func main() {
 		}
 	}
 }
+
+type ConsoleDebugPrinter struct {}
+
+func (c ConsoleDebugPrinter) Print(title, dump string) {
+	println(title)
+	println(dump)
+}
+
