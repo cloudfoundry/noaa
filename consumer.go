@@ -46,13 +46,13 @@ type Noaa interface {
 	TailingLogs(appGuid string, authToken string) (<-chan *events.Envelope, error)
 
 	/*
-	Stream listens indefinitely for log and event messages. It returns two channels; the first is populated
-	with log and event messages, while the second contains errors (e.g. from parsing messages). It returns immediately.
-	Call Close() to terminate the connection when you are finished listening.
+		Stream listens indefinitely for log and event messages. It returns two channels; the first is populated
+		with log and event messages, while the second contains errors (e.g. from parsing messages). It returns immediately.
+		Call Close() to terminate the connection when you are finished listening.
 
-	Messages are presented in the order received from the loggregator server. Chronological or other ordering
-	is not guaranteed. It is the responsibility of the consumer of these channels to provide any desired sorting
-	mechanism.
+		Messages are presented in the order received from the loggregator server. Chronological or other ordering
+		is not guaranteed. It is the responsibility of the consumer of these channels to provide any desired sorting
+		mechanism.
 	*/
 	Stream(appGuid string, authToken string) (<-chan *events.Envelope, error)
 
@@ -120,8 +120,6 @@ func (cnsmr *consumer) TailingLogs(appGuid string, authToken string) (<-chan *ev
 	cnsmr.ws, err = cnsmr.establishWebsocketConnection(tailPath, authToken)
 
 	if err == nil {
-		go cnsmr.sendKeepAlive(KeepAlive)
-
 		go func() {
 			defer close(incomingChan)
 			cnsmr.listenForMessages(incomingChan)
@@ -148,8 +146,6 @@ func (cnsmr *consumer) Stream(appGuid string, authToken string) (<-chan *events.
 	cnsmr.ws, err = cnsmr.establishWebsocketConnection(streamPath, authToken)
 
 	if err == nil {
-		go cnsmr.sendKeepAlive(KeepAlive)
-
 		go func() {
 			defer close(incomingChan)
 			cnsmr.listenForMessages(incomingChan)
@@ -326,16 +322,6 @@ func (lms logMessageSlice) Less(i, j int) bool {
 
 func (lms logMessageSlice) Swap(i, j int) {
 	lms[i], lms[j] = lms[j], lms[i]
-}
-
-func (cnsmr *consumer) sendKeepAlive(interval time.Duration) {
-	for {
-		err := cnsmr.ws.WriteMessage(websocket.TextMessage, []byte("I'm alive!"))
-		if err != nil {
-			return
-		}
-		time.Sleep(interval)
-	}
 }
 
 func (cnsmr *consumer) listenForMessages(msgChan chan<- *events.Envelope) error {

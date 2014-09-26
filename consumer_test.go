@@ -2,15 +2,14 @@ package noaa_test
 
 import (
 	"bytes"
-	"code.google.com/p/go.net/websocket"
 	"code.google.com/p/gogoprotobuf/proto"
 	"crypto/tls"
 	"fmt"
 	"github.com/cloudfoundry/dropsonde/events"
+	"github.com/cloudfoundry/loggregatorlib/loggertesthelper"
+	"github.com/cloudfoundry/loggregatorlib/server/handlers"
 	"github.com/cloudfoundry/noaa"
 	noaa_errors "github.com/cloudfoundry/noaa/errors"
-	"github.com/cloudfoundry/loggregatorlib/server/handlers"
-	"github.com/cloudfoundry/loggregatorlib/loggertesthelper"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"log"
@@ -18,7 +17,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -179,20 +177,6 @@ var _ = Describe("Noaa", func() {
 					close(done)
 				})
 
-				It("sends a keepalive to the server", func() {
-					messageCountingServer := &messageCountingHandler{}
-					testServer := httptest.NewServer(websocket.Handler(messageCountingServer.handle))
-					defer testServer.Close()
-
-					noaa.KeepAlive = 10 * time.Millisecond
-
-					connection = noaa.NewNoaa("ws://"+testServer.Listener.Addr().String(), tlsSettings, consumerProxyFunc)
-					incomingChan, err = connection.TailingLogs(appGuid, authToken)
-					defer connection.Close()
-
-					Eventually(messageCountingServer.count).Should(BeNumerically("~", 10, 2))
-				})
-
 				It("sends messages for a specific app", func() {
 					appGuid = "the-app-guid"
 					perform()
@@ -308,20 +292,6 @@ var _ = Describe("Noaa", func() {
 					Eventually(incomingChan).Should(BeClosed())
 
 					close(done)
-				})
-
-				It("sends a keepalive to the server", func() {
-					messageCountingServer := &messageCountingHandler{}
-					testServer := httptest.NewServer(websocket.Handler(messageCountingServer.handle))
-					defer testServer.Close()
-
-					noaa.KeepAlive = 10 * time.Millisecond
-
-					connection = noaa.NewNoaa("ws://"+testServer.Listener.Addr().String(), tlsSettings, consumerProxyFunc)
-					incomingChan, err = connection.Stream(appGuid, authToken)
-					defer connection.Close()
-
-					Eventually(messageCountingServer.count).Should(BeNumerically("~", 10, 2))
 				})
 
 				It("sends messages for a specific app", func() {
@@ -743,25 +713,6 @@ func (failer authFailer) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("WWW-Authenticate", "Basic")
 	rw.WriteHeader(http.StatusUnauthorized)
 	fmt.Fprintf(rw, "You are not authorized. %s", failer.Message)
-}
-
-type messageCountingHandler struct {
-	msgCount int32
-}
-
-func (mch *messageCountingHandler) handle(conn *websocket.Conn) {
-	buffer := make([]byte, 1024)
-	var err error
-	for err == nil {
-		_, err = conn.Read(buffer)
-		if err == nil {
-			atomic.AddInt32(&mch.msgCount, 1)
-		}
-	}
-}
-
-func (mch *messageCountingHandler) count() int32 {
-	return atomic.LoadInt32(&mch.msgCount)
 }
 
 type FakeHandler struct {
