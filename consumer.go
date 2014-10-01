@@ -56,6 +56,11 @@ type Noaa interface {
 	*/
 	Stream(appGuid string, authToken string) (<-chan *events.Envelope, error)
 
+	/*
+	   Firehose streams all data.
+	*/
+	Firehose(authToken string) (<-chan *events.Envelope, error)
+
 	//	Recent connects to loggregator via its 'recent' endpoint and returns a slice of recent messages.
 	//	It does not guarantee any order of the messages; they are in the order returned by loggregator.
 	//
@@ -139,10 +144,19 @@ is not guaranteed. It is the responsibility of the consumer of these channels to
 mechanism.
 */
 func (cnsmr *consumer) Stream(appGuid string, authToken string) (<-chan *events.Envelope, error) {
+	streamPath := fmt.Sprintf("/apps/%s/stream", appGuid)
+	return cnsmr.stream(streamPath, authToken)
+}
+
+func (cnsmr *consumer) Firehose(authToken string) (<-chan *events.Envelope, error) {
+	streamPath := "/firehose"
+	return cnsmr.stream(streamPath, authToken)
+}
+
+func (cnsmr *consumer) stream(streamPath string, authToken string) (<-chan *events.Envelope, error) {
 	incomingChan := make(chan *events.Envelope)
 	var err error
 
-	streamPath := fmt.Sprintf("/apps/%s/stream", appGuid)
 	cnsmr.ws, err = cnsmr.establishWebsocketConnection(streamPath, authToken)
 
 	if err == nil {

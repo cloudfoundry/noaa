@@ -10,14 +10,15 @@ import (
 	"github.com/cloudfoundry/loggregatorlib/server/handlers"
 	"github.com/cloudfoundry/noaa"
 	noaa_errors "github.com/cloudfoundry/noaa/errors"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"sync"
 	"time"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Noaa", func() {
@@ -571,6 +572,121 @@ var _ = Describe("Noaa", func() {
 				Expect(recentError).To(HaveOccurred())
 				Expect(recentError.Error()).To(ContainSubstring("You are not authorized. Helpful message"))
 				Expect(recentError).To(BeAssignableToTypeOf(&noaa_errors.UnauthorizedError{}))
+			})
+		})
+
+		Describe("Firehose", func() {
+			perform := func() {
+				connection = noaa.NewNoaa(endpoint, tlsSettings, consumerProxyFunc)
+				incomingChan, err = connection.Firehose(authToken)
+			}
+
+			BeforeEach(func() {
+				startFakeTrafficController()
+			})
+
+			Context("when there is no TLS Config or consumerProxyFunc setting", func() {
+				Context("when the connection can be established", func() {
+					It("receives messages on the incoming channel", func(done Done) {
+						messagesToSend <- marshalMessage(createMessage("hello", 0))
+
+						perform()
+						message := <-incomingChan
+
+						Expect(message.GetLogMessage().GetMessage()).To(Equal([]byte("hello")))
+						close(messagesToSend)
+
+						close(done)
+					})
+
+					It("closes the channel after the server closes the connection", func(done Done) {
+						perform()
+						close(messagesToSend)
+
+						Eventually(incomingChan).Should(BeClosed())
+
+						close(done)
+					})
+
+					It("receives messages from the full firehose", func() {
+						perform()
+						close(messagesToSend)
+
+						Eventually(fakeHandler.getLastURL).Should(ContainSubstring("/firehose"))
+					})
+
+					It("sends an Authorization header with an access token", func() {
+						authToken = "auth-token"
+						perform()
+						close(messagesToSend)
+
+						Eventually(fakeHandler.getAuthHeader).Should(Equal("auth-token"))
+					})
+
+					Context("when the message fails to parse", func() {
+						It("skips that message but continues to read messages", func(done Done) {
+							messagesToSend <- []byte{0}
+							messagesToSend <- marshalMessage(createMessage("hello", 0))
+							perform()
+							close(messagesToSend)
+
+							message := <-incomingChan
+
+							Expect(message.GetLogMessage().GetMessage()).To(Equal([]byte("hello")))
+
+							close(done)
+						})
+					})
+				})
+
+				Context("when the connection cannot be established", func() {
+					BeforeEach(func() {
+						endpoint = "!!!bad-endpoint"
+					})
+
+					It("returns an error", func(done Done) {
+						perform()
+
+						Expect(err).To(HaveOccurred())
+						Expect(err.Error()).To(ContainSubstring("Please ask your Cloud Foundry Operator"))
+
+						close(done)
+					})
+				})
+
+				Context("when the authorization fails", func() {
+					var failer authFailer
+
+					BeforeEach(func() {
+						failer = authFailer{Message: "Helpful message"}
+						testServer = httptest.NewServer(failer)
+						endpoint = "ws://" + testServer.Listener.Addr().String()
+					})
+
+					It("it returns a helpful error message", func() {
+						perform()
+
+						Expect(err).To(HaveOccurred())
+						Expect(err.Error()).To(ContainSubstring("You are not authorized. Helpful message"))
+						Expect(err).To(BeAssignableToTypeOf(&noaa_errors.UnauthorizedError{}))
+					})
+				})
+			})
+
+			Context("when SSL settings are passed in", func() {
+				BeforeEach(func() {
+					testServer = httptest.NewTLSServer(handlers.NewWebsocketHandler(messagesToSend, 100*time.Millisecond, loggertesthelper.Logger()))
+					endpoint = "wss://" + testServer.Listener.Addr().String()
+
+					tlsSettings = &tls.Config{InsecureSkipVerify: true}
+				})
+
+				It("connects using those settings", func() {
+					perform()
+					close(messagesToSend)
+
+					Expect(err).NotTo(HaveOccurred())
+				})
 			})
 		})
 	})
