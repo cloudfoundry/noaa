@@ -155,7 +155,7 @@ var _ = Describe("Noaa behind a Proxy", func() {
 			Expect(incomingMessages[1].GetLogMessage().GetMessage()).To(Equal([]byte("test-message-1")))
 		})
 
-		FIt("connects using failing proxyFunc", func() {
+		It("connects using failing proxyFunc", func() {
 			errMsg := "Invalid consumerProxyFunc URL"
 			consumerProxyFunc = func(*http.Request) (*url.URL, error) {
 				return nil, errors.New(errMsg)
