@@ -118,20 +118,22 @@ is not guaranteed. It is the responsibility of the consumer of these channels to
 mechanism.
 */
 func (cnsmr *consumer) TailingLogs(appGuid string, authToken string) (<-chan *events.Envelope, error) {
-	incomingChan := make(chan *events.Envelope)
-	var err error
+	eventsWithoutMetrics := make(chan *events.Envelope)
 
-	tailPath := fmt.Sprintf("/apps/%s/tailinglogs", appGuid)
-	cnsmr.ws, err = cnsmr.establishWebsocketConnection(tailPath, authToken)
+	streamPath := fmt.Sprintf("/apps/%s/stream", appGuid)
+	eventsWithMetrics, err := cnsmr.stream(streamPath, authToken)
 
-	if err == nil {
-		go func() {
-			defer close(incomingChan)
-			cnsmr.listenForMessages(incomingChan)
-		}()
-	}
+	go func(){
+		for event := range eventsWithMetrics {
+			if *event.EventType == events.Envelope_LogMessage {
+				eventsWithoutMetrics <- event
+			}
+		}
 
-	return incomingChan, err
+		close(eventsWithoutMetrics)
+	}()
+
+	return eventsWithoutMetrics, err
 }
 
 /*

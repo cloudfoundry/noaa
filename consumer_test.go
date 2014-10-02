@@ -169,6 +169,19 @@ var _ = Describe("Noaa", func() {
 					close(done)
 				})
 
+				It("does not include metrics", func(done Done) {
+					messagesToSend <- marshalMessage(createHeartbeat(1, 2, 3, 4))
+					messagesToSend <- marshalMessage(createMessage("hello", 0))
+
+					perform()
+					message := <-incomingChan
+
+					Expect(message.GetLogMessage().GetMessage()).To(Equal([]byte("hello")))
+					close(messagesToSend)
+
+					close(done)
+				})
+
 				It("closes the channel after the server closes the connection", func(done Done) {
 					perform()
 					close(messagesToSend)
@@ -183,7 +196,7 @@ var _ = Describe("Noaa", func() {
 					perform()
 					close(messagesToSend)
 
-					Eventually(fakeHandler.getLastURL).Should(ContainSubstring("/apps/the-app-guid/tailinglogs"))
+					Eventually(fakeHandler.getLastURL).Should(ContainSubstring("/apps/the-app-guid/stream"))
 				})
 
 				It("sends an Authorization header with an access token", func() {
@@ -806,6 +819,26 @@ func createMessage(message string, timestamp int64) *events.Envelope {
 	eventType := events.Envelope_LogMessage
 	return &events.Envelope{
 		LogMessage: logMessage,
+		EventType:  &eventType,
+		Origin:     proto.String("fake-origin-1"),
+		Timestamp:  proto.Int64(timestamp),
+	}
+}
+
+func createHeartbeat(sentCount, receivedCount, errorCount uint64, timestamp int64) *events.Envelope {
+	if timestamp == 0 {
+		timestamp = time.Now().UnixNano()
+	}
+
+	heartbeat := &events.Heartbeat{
+		SentCount:     proto.Uint64(sentCount),
+		ReceivedCount: proto.Uint64(receivedCount),
+		ErrorCount:    proto.Uint64(errorCount),
+	}
+
+	eventType := events.Envelope_Heartbeat
+	return &events.Envelope{
+		Heartbeat: 	heartbeat,
 		EventType:  &eventType,
 		Origin:     proto.String("fake-origin-1"),
 		Timestamp:  proto.Int64(timestamp),
