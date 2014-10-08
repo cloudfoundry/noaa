@@ -7,9 +7,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"github.com/cloudfoundry/dropsonde/dropsonde_unmarshaller"
-	"github.com/cloudfoundry/dropsonde/events"
-	"github.com/cloudfoundry/gosteno"
+	"github.com/cloudfoundry/noaa/events"
 	noaa_errors "github.com/cloudfoundry/noaa/errors"
 	"github.com/gorilla/websocket"
 	"io/ioutil"
@@ -343,20 +341,19 @@ func (lms logMessageSlice) Swap(i, j int) {
 func (cnsmr *consumer) listenForMessages(msgChan chan<- *events.Envelope) error {
 	defer cnsmr.ws.Close()
 
-	unmarshaller := dropsonde_unmarshaller.NewDropsondeUnmarshaller(gosteno.NewLogger(""))
-
 	for {
 		_, data, err := cnsmr.ws.ReadMessage()
 		if err != nil {
 			return err
 		}
 
-		msg, err := unmarshaller.UnmarshallMessage(data)
+		envelope := &events.Envelope{}
+		err = proto.Unmarshal(data, envelope)
 		if err != nil {
 			continue
 		}
 
-		msgChan <- msg
+		msgChan <- envelope
 	}
 }
 

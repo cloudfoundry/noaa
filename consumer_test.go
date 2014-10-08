@@ -5,7 +5,7 @@ import (
 	"code.google.com/p/gogoprotobuf/proto"
 	"crypto/tls"
 	"fmt"
-	"github.com/cloudfoundry/dropsonde/events"
+	"github.com/cloudfoundry/noaa/events"
 	"github.com/cloudfoundry/loggregatorlib/loggertesthelper"
 	"github.com/cloudfoundry/loggregatorlib/server/handlers"
 	"github.com/cloudfoundry/noaa"

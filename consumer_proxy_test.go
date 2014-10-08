@@ -13,7 +13,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"time"
-	"github.com/cloudfoundry/dropsonde/events"
+	"github.com/cloudfoundry/noaa/events"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
