@@ -5,11 +5,11 @@ import (
 	"code.google.com/p/gogoprotobuf/proto"
 	"crypto/tls"
 	"fmt"
-	"github.com/cloudfoundry/noaa/events"
 	"github.com/cloudfoundry/loggregatorlib/loggertesthelper"
 	"github.com/cloudfoundry/loggregatorlib/server/handlers"
 	"github.com/cloudfoundry/noaa"
 	noaa_errors "github.com/cloudfoundry/noaa/errors"
+	"github.com/cloudfoundry/noaa/events"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -23,12 +23,12 @@ import (
 
 var _ = Describe("Noaa", func() {
 	var (
-		connection        noaa.Noaa
-		endpoint          string
-		testServer        *httptest.Server
-		fakeHandler       *FakeHandler
-		tlsSettings       *tls.Config
-		consumerProxyFunc func(*http.Request) (*url.URL, error)
+		connection           noaa.Noaa
+		trafficControllerUrl string
+		testServer           *httptest.Server
+		fakeHandler          *FakeHandler
+		tlsSettings          *tls.Config
+		consumerProxyFunc    func(*http.Request) (*url.URL, error)
 
 		appGuid        string
 		authToken      string
@@ -56,7 +56,7 @@ var _ = Describe("Noaa", func() {
 	Describe("SetOnConnectCallback", func() {
 		BeforeEach(func() {
 			testServer = httptest.NewServer(handlers.NewWebsocketHandler(messagesToSend, 100*time.Millisecond, loggertesthelper.Logger()))
-			endpoint = "ws://" + testServer.Listener.Addr().String()
+			trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
 			close(messagesToSend)
 		})
 
@@ -64,7 +64,7 @@ var _ = Describe("Noaa", func() {
 			called := false
 			cb := func() { called = true }
 
-			connection = noaa.NewNoaa(endpoint, tlsSettings, nil)
+			connection = noaa.NewNoaa(trafficControllerUrl, tlsSettings, nil)
 			connection.SetOnConnectCallback(cb)
 			connection.TailingLogs(appGuid, authToken)
 
@@ -73,12 +73,12 @@ var _ = Describe("Noaa", func() {
 
 		Context("when the connection fails", func() {
 			It("does not call the callback", func() {
-				endpoint = "!!!bad-endpoint"
+				trafficControllerUrl = "!!!bad-url"
 
 				called := false
 				cb := func() { called = true }
 
-				connection = noaa.NewNoaa(endpoint, tlsSettings, nil)
+				connection = noaa.NewNoaa(trafficControllerUrl, tlsSettings, nil)
 				connection.SetOnConnectCallback(cb)
 				connection.TailingLogs(appGuid, authToken)
 
@@ -88,19 +88,19 @@ var _ = Describe("Noaa", func() {
 
 		Context("when authorization fails", func() {
 			var failer authFailer
-			var endpoint string
+			var trafficControllerUrl string
 
 			BeforeEach(func() {
 				failer = authFailer{Message: "Helpful message"}
 				testServer = httptest.NewServer(failer)
-				endpoint = "ws://" + testServer.Listener.Addr().String()
+				trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
 			})
 
 			It("does not call the callback", func() {
 				called := false
 				cb := func() { called = true }
 
-				connection = noaa.NewNoaa(endpoint, tlsSettings, nil)
+				connection = noaa.NewNoaa(trafficControllerUrl, tlsSettings, nil)
 				connection.SetOnConnectCallback(cb)
 				connection.TailingLogs(appGuid, authToken)
 
@@ -113,7 +113,7 @@ var _ = Describe("Noaa", func() {
 	var startFakeTrafficController = func() {
 		fakeHandler = &FakeHandler{innerHandler: handlers.NewWebsocketHandler(messagesToSend, 100*time.Millisecond, loggertesthelper.Logger())}
 		testServer = httptest.NewServer(fakeHandler)
-		endpoint = "ws://" + testServer.Listener.Addr().String()
+		trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
 		appGuid = "app-guid"
 	}
 
@@ -124,7 +124,7 @@ var _ = Describe("Noaa", func() {
 			startFakeTrafficController()
 
 			debugPrinter = &fakeDebugPrinter{}
-			connection = noaa.NewNoaa(endpoint, tlsSettings, consumerProxyFunc)
+			connection = noaa.NewNoaa(trafficControllerUrl, tlsSettings, consumerProxyFunc)
 			connection.SetDebugPrinter(debugPrinter)
 		})
 
@@ -147,7 +147,7 @@ var _ = Describe("Noaa", func() {
 
 	Describe("TailingLogs", func() {
 		perform := func() {
-			connection = noaa.NewNoaa(endpoint, tlsSettings, consumerProxyFunc)
+			connection = noaa.NewNoaa(trafficControllerUrl, tlsSettings, consumerProxyFunc)
 			incomingChan, err = connection.TailingLogs(appGuid, authToken)
 		}
 
@@ -225,7 +225,7 @@ var _ = Describe("Noaa", func() {
 
 			Context("when the connection cannot be established", func() {
 				BeforeEach(func() {
-					endpoint = "!!!bad-endpoint"
+					trafficControllerUrl = "!!!bad-url"
 				})
 
 				It("returns an error", func(done Done) {
@@ -244,7 +244,7 @@ var _ = Describe("Noaa", func() {
 				BeforeEach(func() {
 					failer = authFailer{Message: "Helpful message"}
 					testServer = httptest.NewServer(failer)
-					endpoint = "ws://" + testServer.Listener.Addr().String()
+					trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
 				})
 
 				It("it returns a helpful error message", func() {
@@ -261,7 +261,7 @@ var _ = Describe("Noaa", func() {
 			BeforeEach(func() {
 				//				fakeHandler = &FakeHandler{innerHandler: }
 				testServer = httptest.NewTLSServer(handlers.NewWebsocketHandler(messagesToSend, 100*time.Millisecond, loggertesthelper.Logger()))
-				endpoint = "wss://" + testServer.Listener.Addr().String()
+				trafficControllerUrl = "wss://" + testServer.Listener.Addr().String()
 
 				tlsSettings = &tls.Config{InsecureSkipVerify: true}
 			})
@@ -277,7 +277,7 @@ var _ = Describe("Noaa", func() {
 
 	Describe("Stream", func() {
 		perform := func() {
-			connection = noaa.NewNoaa(endpoint, tlsSettings, consumerProxyFunc)
+			connection = noaa.NewNoaa(trafficControllerUrl, tlsSettings, consumerProxyFunc)
 			incomingChan, err = connection.Stream(appGuid, authToken)
 		}
 
@@ -342,7 +342,7 @@ var _ = Describe("Noaa", func() {
 
 			Context("when the connection cannot be established", func() {
 				BeforeEach(func() {
-					endpoint = "!!!bad-endpoint"
+					trafficControllerUrl = "!!!bad-url"
 				})
 
 				It("returns an error", func(done Done) {
@@ -361,7 +361,7 @@ var _ = Describe("Noaa", func() {
 				BeforeEach(func() {
 					failer = authFailer{Message: "Helpful message"}
 					testServer = httptest.NewServer(failer)
-					endpoint = "ws://" + testServer.Listener.Addr().String()
+					trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
 				})
 
 				It("it returns a helpful error message", func() {
@@ -378,7 +378,7 @@ var _ = Describe("Noaa", func() {
 			BeforeEach(func() {
 				//				fakeHandler = &FakeHandler{innerHandler: }
 				testServer = httptest.NewTLSServer(handlers.NewWebsocketHandler(messagesToSend, 100*time.Millisecond, loggertesthelper.Logger()))
-				endpoint = "wss://" + testServer.Listener.Addr().String()
+				trafficControllerUrl = "wss://" + testServer.Listener.Addr().String()
 
 				tlsSettings = &tls.Config{InsecureSkipVerify: true}
 			})
@@ -396,12 +396,12 @@ var _ = Describe("Noaa", func() {
 		BeforeEach(func() {
 			fakeHandler = &FakeHandler{innerHandler: handlers.NewWebsocketHandler(messagesToSend, 100*time.Millisecond, loggertesthelper.Logger())}
 			testServer = httptest.NewServer(fakeHandler)
-			endpoint = "ws://" + testServer.Listener.Addr().String()
+			trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
 		})
 
 		Context("when a connection is not open", func() {
 			It("returns an error", func() {
-				connection = noaa.NewNoaa(endpoint, nil, nil)
+				connection = noaa.NewNoaa(trafficControllerUrl, nil, nil)
 				err := connection.Close()
 
 				Expect(err.Error()).To(Equal("connection does not exist"))
@@ -410,7 +410,7 @@ var _ = Describe("Noaa", func() {
 
 		Context("when a connection is open", func() {
 			It("closes any open channels", func(done Done) {
-				connection = noaa.NewNoaa(endpoint, nil, nil)
+				connection = noaa.NewNoaa(trafficControllerUrl, nil, nil)
 				incomingChan, err := connection.TailingLogs("app-guid", "auth-token")
 				close(messagesToSend)
 
@@ -436,13 +436,13 @@ var _ = Describe("Noaa", func() {
 
 		perform := func() {
 			close(messagesToSend)
-			connection = noaa.NewNoaa(endpoint, nil, nil)
+			connection = noaa.NewNoaa(trafficControllerUrl, nil, nil)
 			receivedLogMessages, recentError = connection.RecentLogs(appGuid, authToken)
 		}
 
 		Context("when the connection cannot be established", func() {
-			It("invalid endpoints return error", func() {
-				endpoint = "invalid-endpoint"
+			It("invalid urls return error", func() {
+				trafficControllerUrl = "invalid-url"
 				perform()
 
 				Expect(recentError).ToNot(BeNil())
@@ -453,7 +453,7 @@ var _ = Describe("Noaa", func() {
 
 			BeforeEach(func() {
 				testServer = httptest.NewServer(handlers.NewHttpHandler(messagesToSend, loggertesthelper.Logger()))
-				endpoint = "ws://" + testServer.Listener.Addr().String()
+				trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
 			})
 
 			It("returns messages from the server", func() {
@@ -478,7 +478,7 @@ var _ = Describe("Noaa", func() {
 					resp.Write([]byte("OK"))
 				})
 				testServer = httptest.NewServer(serverMux)
-				endpoint = "ws://" + testServer.Listener.Addr().String()
+				trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
 			})
 
 			It("it returns a bad reponse error message", func() {
@@ -494,7 +494,7 @@ var _ = Describe("Noaa", func() {
 			BeforeEach(func() {
 				fakeHandler = &FakeHandler{contentLen: "-1", innerHandler: handlers.NewHttpHandler(messagesToSend, loggertesthelper.Logger())}
 				testServer = httptest.NewServer(fakeHandler)
-				endpoint = "ws://" + testServer.Listener.Addr().String()
+				trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
 			})
 
 			It("it handles that without throwing an error", func() {
@@ -515,7 +515,7 @@ var _ = Describe("Noaa", func() {
 					resp.Write([]byte("OK"))
 				})
 				testServer = httptest.NewServer(serverMux)
-				endpoint = "ws://" + testServer.Listener.Addr().String()
+				trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
 			})
 
 			It("it returns a bad reponse error message", func() {
@@ -536,7 +536,7 @@ var _ = Describe("Noaa", func() {
 					resp.Write([]byte("OK"))
 				})
 				testServer = httptest.NewServer(serverMux)
-				endpoint = "ws://" + testServer.Listener.Addr().String()
+				trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
 			})
 
 			It("it returns a bad reponse error message", func() {
@@ -556,7 +556,7 @@ var _ = Describe("Noaa", func() {
 					resp.WriteHeader(http.StatusNotFound)
 				})
 				testServer = httptest.NewServer(serverMux)
-				endpoint = "ws://" + testServer.Listener.Addr().String()
+				trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
 			})
 
 			It("it returns a not found reponse error message", func() {
@@ -576,7 +576,7 @@ var _ = Describe("Noaa", func() {
 				serverMux := http.NewServeMux()
 				serverMux.Handle("/apps/appGuid/recentlogs", failer)
 				testServer = httptest.NewServer(serverMux)
-				endpoint = "ws://" + testServer.Listener.Addr().String()
+				trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
 			})
 
 			It("it returns a helpful error message", func() {
@@ -590,8 +590,8 @@ var _ = Describe("Noaa", func() {
 
 		Describe("Firehose", func() {
 			perform := func() {
-				connection = noaa.NewNoaa(endpoint, tlsSettings, consumerProxyFunc)
-				incomingChan, err = connection.Firehose(authToken)
+				connection = noaa.NewNoaa(trafficControllerUrl, tlsSettings, consumerProxyFunc)
+				incomingChan, err = connection.Firehose("subscription-id", authToken)
 			}
 
 			BeforeEach(func() {
@@ -625,7 +625,7 @@ var _ = Describe("Noaa", func() {
 						perform()
 						close(messagesToSend)
 
-						Eventually(fakeHandler.getLastURL).Should(ContainSubstring("/firehose"))
+						Eventually(fakeHandler.getLastURL).Should(ContainSubstring("/firehose/subscription-id"))
 					})
 
 					It("sends an Authorization header with an access token", func() {
@@ -654,7 +654,7 @@ var _ = Describe("Noaa", func() {
 
 				Context("when the connection cannot be established", func() {
 					BeforeEach(func() {
-						endpoint = "!!!bad-endpoint"
+						trafficControllerUrl = "!!!bad-url"
 					})
 
 					It("returns an error", func(done Done) {
@@ -673,7 +673,7 @@ var _ = Describe("Noaa", func() {
 					BeforeEach(func() {
 						failer = authFailer{Message: "Helpful message"}
 						testServer = httptest.NewServer(failer)
-						endpoint = "ws://" + testServer.Listener.Addr().String()
+						trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
 					})
 
 					It("it returns a helpful error message", func() {
@@ -689,7 +689,7 @@ var _ = Describe("Noaa", func() {
 			Context("when SSL settings are passed in", func() {
 				BeforeEach(func() {
 					testServer = httptest.NewTLSServer(handlers.NewWebsocketHandler(messagesToSend, 100*time.Millisecond, loggertesthelper.Logger()))
-					endpoint = "wss://" + testServer.Listener.Addr().String()
+					trafficControllerUrl = "wss://" + testServer.Listener.Addr().String()
 
 					tlsSettings = &tls.Config{InsecureSkipVerify: true}
 				})
@@ -714,19 +714,19 @@ var _ = Describe("Noaa", func() {
 
 		perform := func() {
 			close(messagesToSend)
-			connection = noaa.NewNoaa(endpoint, nil, nil)
+			connection = noaa.NewNoaa(trafficControllerUrl, nil, nil)
 			logMessages, recentError = connection.RecentLogs(appGuid, authToken)
 		}
 
 		BeforeEach(func() {
 			fakeHandler = &FakeHandler{innerHandler: handlers.NewWebsocketHandler(messagesToSend, 100*time.Millisecond, loggertesthelper.Logger())}
 			testServer = httptest.NewServer(fakeHandler)
-			endpoint = "ws://" + testServer.Listener.Addr().String()
+			trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
 		})
 
 		Context("when the connection cannot be established", func() {
 			It("returns an error", func() {
-				endpoint = "invalid-endpoint"
+				trafficControllerUrl = "invalid-url"
 				perform()
 
 				Expect(recentError).ToNot(BeNil())
@@ -750,7 +750,7 @@ var _ = Describe("Noaa", func() {
 				Expect(logMessages[1].GetLogMessage().GetMessage()).To(Equal([]byte("test-message-1")))
 			})
 
-			It("calls the right path on the loggregator endpoint", func() {
+			It("calls the right path on the traffic controller url", func() {
 				appGuid = "app-guid"
 				perform()
 
@@ -764,7 +764,7 @@ var _ = Describe("Noaa", func() {
 			BeforeEach(func() {
 				failer = authFailer{Message: "Helpful message"}
 				testServer = httptest.NewServer(failer)
-				endpoint = "ws://" + testServer.Listener.Addr().String()
+				trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
 			})
 
 			It("it returns a helpful error message", func() {
@@ -838,10 +838,10 @@ func createHeartbeat(sentCount, receivedCount, errorCount uint64, timestamp int6
 
 	eventType := events.Envelope_Heartbeat
 	return &events.Envelope{
-		Heartbeat: 	heartbeat,
-		EventType:  &eventType,
-		Origin:     proto.String("fake-origin-1"),
-		Timestamp:  proto.Int64(timestamp),
+		Heartbeat: heartbeat,
+		EventType: &eventType,
+		Origin:    proto.String("fake-origin-1"),
+		Timestamp: proto.Int64(timestamp),
 	}
 }
 

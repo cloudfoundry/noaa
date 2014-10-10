@@ -7,8 +7,8 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"github.com/cloudfoundry/noaa/events"
 	noaa_errors "github.com/cloudfoundry/noaa/errors"
+	"github.com/cloudfoundry/noaa/events"
 	"github.com/gorilla/websocket"
 	"io/ioutil"
 	"mime/multipart"
@@ -30,7 +30,7 @@ var (
 	ErrBadRequest  = errors.New("bad client request")
 )
 
-/* Noaa represents the actions that can be performed against a loggregator server.
+/* Noaa represents the actions that can be performed against traffic controller.
  */
 type Noaa interface {
 
@@ -57,15 +57,15 @@ type Noaa interface {
 	/*
 	   Firehose streams all data.
 	*/
-	Firehose(authToken string) (<-chan *events.Envelope, error)
+	Firehose(subscriptionId, authToken string) (<-chan *events.Envelope, error)
 
-	//	Recent connects to loggregator via its 'recent' endpoint and returns a slice of recent messages.
-	//	It does not guarantee any order of the messages; they are in the order returned by loggregator.
+	//	Recent connects to traffic controller via its 'recent' endpoint and returns a slice of recent messages.
+	//	It does not guarantee any order of the messages; they are in the order returned by traffic controller.
 	//
 	//	The SortRecent method is provided to sort the data returned by this method.
 	RecentLogs(appGuid string, authToken string) ([]*events.Envelope, error)
 
-	// Close terminates the websocket connection to loggregator.
+	// Close terminates the websocket connection to traffic controller.
 	Close() error
 
 	// SetOnConnectCallback sets a callback function to be called with the websocket connection is established.
@@ -86,18 +86,18 @@ func (nullDebugPrinter) Print(title, body string) {
 }
 
 type consumer struct {
-	endpoint     string
-	tlsConfig    *tls.Config
-	ws           *websocket.Conn
-	callback     func()
-	proxy        func(*http.Request) (*url.URL, error)
-	debugPrinter DebugPrinter
+	trafficControllerUrl string
+	tlsConfig            *tls.Config
+	ws                   *websocket.Conn
+	callback             func()
+	proxy                func(*http.Request) (*url.URL, error)
+	debugPrinter         DebugPrinter
 }
 
-/* New creates a new consumer to a loggregator endpoint.
+/* New creates a new consumer to a traffic controller.
  */
-func NewNoaa(endpoint string, tlsConfig *tls.Config, proxy func(*http.Request) (*url.URL, error)) Noaa {
-	return &consumer{endpoint: endpoint, tlsConfig: tlsConfig, proxy: proxy, debugPrinter: nullDebugPrinter{}}
+func NewNoaa(trafficControllerUrl string, tlsConfig *tls.Config, proxy func(*http.Request) (*url.URL, error)) Noaa {
+	return &consumer{trafficControllerUrl: trafficControllerUrl, tlsConfig: tlsConfig, proxy: proxy, debugPrinter: nullDebugPrinter{}}
 }
 
 /* SetDebugPrinter enables logging of the websocket handshake
@@ -111,7 +111,7 @@ TailingLogs listens indefinitely for log messages. It returns two channels; the 
 with log messages, while the second contains errors (e.g. from parsing messages). It returns immediately.
 Call Close() to terminate the connection when you are finished listening.
 
-Messages are presented in the order received from the loggregator server. Chronological or other ordering
+Messages are presented in the order received from the traffic controller server. Chronological or other ordering
 is not guaranteed. It is the responsibility of the consumer of these channels to provide any desired sorting
 mechanism.
 */
@@ -121,7 +121,7 @@ func (cnsmr *consumer) TailingLogs(appGuid string, authToken string) (<-chan *ev
 	streamPath := fmt.Sprintf("/apps/%s/stream", appGuid)
 	eventsWithMetrics, err := cnsmr.stream(streamPath, authToken)
 
-	go func(){
+	go func() {
 		for event := range eventsWithMetrics {
 			if *event.EventType == events.Envelope_LogMessage {
 				eventsWithoutMetrics <- event
@@ -139,7 +139,7 @@ Stream listens indefinitely for log and event messages. It returns two channels;
 with log and event messages, while the second contains errors (e.g. from parsing messages). It returns immediately.
 Call Close() to terminate the connection when you are finished listening.
 
-Messages are presented in the order received from the loggregator server. Chronological or other ordering
+Messages are presented in the order received from the traffic controller server. Chronological or other ordering
 is not guaranteed. It is the responsibility of the consumer of these channels to provide any desired sorting
 mechanism.
 */
@@ -148,8 +148,8 @@ func (cnsmr *consumer) Stream(appGuid string, authToken string) (<-chan *events.
 	return cnsmr.stream(streamPath, authToken)
 }
 
-func (cnsmr *consumer) Firehose(authToken string) (<-chan *events.Envelope, error) {
-	streamPath := "/firehose"
+func (cnsmr *consumer) Firehose(subscriptionId, authToken string) (<-chan *events.Envelope, error) {
+	streamPath := "/firehose/" + subscriptionId
 	return cnsmr.stream(streamPath, authToken)
 }
 
@@ -170,11 +170,11 @@ func (cnsmr *consumer) stream(streamPath string, authToken string) (<-chan *even
 }
 
 /*
-RecentLogs connects to loggregator via its 'recentlogs' http(s) endpoint and returns a slice of recent messages.
-If the new http 'recentlogs' endpoint isn't supported (ie you are connecting to an older loggregator server),
+RecentLogs connects to traffic controller via its 'recentlogs' http(s) endpoint and returns a slice of recent messages.
+If the new http 'recentlogs' endpoint isn't supported (ie you are connecting to an older traffic controller server),
 we will fallback to the old Websocket 'dump' endpoint.
 
-It does not guarantee any order of the messages; they are in the order returned by loggregator.
+It does not guarantee any order of the messages; they are in the order returned by traffic controller.
 
 The SortRecent method is provided to sort the data returned by this method.
 */
@@ -188,22 +188,22 @@ func (cnsmr *consumer) RecentLogs(appGuid string, authToken string) ([]*events.E
 }
 
 /*
-httpRecent connects to loggregator via its 'recentlogs' http(s) endpoint and returns a slice of recent messages.
-It does not guarantee any order of the messages; they are in the order returned by loggregator.
+httpRecent connects to traffic controller via its 'recentlogs' http(s) endpoint and returns a slice of recent messages.
+It does not guarantee any order of the messages; they are in the order returned by traffic controller.
 */
 func (cnsmr *consumer) httpRecentLogs(appGuid string, authToken string) ([]*events.Envelope, error) {
-	endpointUrl, err := url.ParseRequestURI(cnsmr.endpoint)
+	trafficControllerUrl, err := url.ParseRequestURI(cnsmr.trafficControllerUrl)
 	if err != nil {
 		return nil, err
 	}
 
 	scheme := "https"
 
-	if endpointUrl.Scheme == "ws" {
+	if trafficControllerUrl.Scheme == "ws" {
 		scheme = "http"
 	}
 
-	recentPath := fmt.Sprintf("%s://%s/apps/%s/recentlogs", scheme, endpointUrl.Host, appGuid)
+	recentPath := fmt.Sprintf("%s://%s/apps/%s/recentlogs", scheme, trafficControllerUrl.Host, appGuid)
 	transport := &http.Transport{Proxy: cnsmr.proxy, TLSClientConfig: cnsmr.tlsConfig}
 	client := &http.Client{Transport: transport}
 
@@ -212,7 +212,7 @@ func (cnsmr *consumer) httpRecentLogs(appGuid string, authToken string) ([]*even
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("Error dialing loggregator server: %s.\nPlease ask your Cloud Foundry Operator to check the platform configuration (loggregator endpoint is %s).", err.Error(), cnsmr.endpoint))
+		return nil, errors.New(fmt.Sprintf("Error dialing traffic controller server: %s.\nPlease ask your Cloud Foundry Operator to check the platform configuration (traffic controller endpoint is %s).", err.Error(), cnsmr.trafficControllerUrl))
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusUnauthorized {
@@ -261,8 +261,8 @@ func (cnsmr *consumer) httpRecentLogs(appGuid string, authToken string) ([]*even
 }
 
 /*
-dump connects to loggregator via its 'dump' ws(s) endpoint and returns a slice of recent messages. It does not
-guarantee any order of the messages; they are in the order returned by loggregator.
+dump connects to traffic controller via its 'dump' ws(s) endpoint and returns a slice of recent messages. It does not
+guarantee any order of the messages; they are in the order returned by traffic controller.
 
 The SortRecent method is provided to sort the data returned by this method.
 */
@@ -299,7 +299,7 @@ drainLoop:
 	return messages, nil
 }
 
-/* Close terminates the websocket connection to loggregator.
+/* Close terminates the websocket connection to traffic controller.
  */
 func (cnsmr *consumer) Close() error {
 	if cnsmr.ws == nil {
@@ -370,11 +370,11 @@ func (cnsmr *consumer) establishWebsocketConnection(path string, authToken strin
 
 	dialer := websocket.Dialer{NetDial: cnsmr.proxyDial, TLSClientConfig: cnsmr.tlsConfig}
 
-	url := cnsmr.endpoint + path
+	url := cnsmr.trafficControllerUrl + path
 
 	cnsmr.debugPrinter.Print("WEBSOCKET REQUEST:",
 		"GET "+path+" HTTP/1.1\n"+
-			"Host: "+cnsmr.endpoint+"\n"+
+			"Host: "+cnsmr.trafficControllerUrl+"\n"+
 			"Upgrade: websocket\nConnection: Upgrade\nSec-WebSocket-Version: 13\nSec-WebSocket-Key: [HIDDEN]\n"+
 			headersString(header))
 
@@ -397,7 +397,7 @@ func (cnsmr *consumer) establishWebsocketConnection(path string, authToken strin
 	}
 
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("Error dialing loggregator server: %s.\nPlease ask your Cloud Foundry Operator to check the platform configuration (loggregator endpoint is %s).", err.Error(), cnsmr.endpoint))
+		return nil, errors.New(fmt.Sprintf("Error dialing traffic controller server: %s.\nPlease ask your Cloud Foundry Operator to check the platform configuration (traffic controller is %s).", err.Error(), cnsmr.trafficControllerUrl))
 	}
 
 	return ws, err

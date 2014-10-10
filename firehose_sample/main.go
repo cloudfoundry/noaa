@@ -27,10 +27,9 @@ func main() {
 
 }
 
-type ConsoleDebugPrinter struct {}
+type ConsoleDebugPrinter struct{}
 
 func (c ConsoleDebugPrinter) Print(title, dump string) {
 	println(title)
 	println(dump)
 }
-
