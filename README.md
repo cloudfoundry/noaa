@@ -48,6 +48,8 @@ go build -o bin/firehose_sample firehose_sample/main.go
 bin/firehose_sample
 ```
 
+Multiple subscribers may connect to the firehose endpoint, each with a unique subscription_id (configurable in `main.go`). Each subscriber (in practice, a pool of clients with a common subscription_id) receives the entire stream. For each subscription_id, all data will be distributed evenly among that subscriber's client pool.
+
 ##Development
 
 Use `go get -d -v -t ./... && ginkgo --race --randomizeAllSpecs --failOnPending --skipMeasurements --cover` to
