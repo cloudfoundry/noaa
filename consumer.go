@@ -30,39 +30,37 @@ var (
 	ErrBadRequest  = errors.New("bad client request")
 )
 
-/* Noaa represents the actions that can be performed against traffic controller.
- */
+// Noaa represents the actions that can be performed against traffic controller.
 type Noaa interface {
 
-	//	TailingLogs listens indefinitely for log messages. It returns two channels; the first is populated
-	//	with log messages, while the second contains errors (e.g. from parsing messages). It returns
-	//	immediately. Call Close() to terminate the connection when you are finished listening.
+	// TailingLogs listens indefinitely for log messages. It returns two channels; the first is populated
+	// with log messages, while the second contains errors (e.g. from parsing messages). It returns
+	// immediately. Call Close() to terminate the connection when you are finished listening.
 	//
-	//	Messages are presented in the order received from the loggregator server. Chronological or
-	//	other ordering is not guaranteed. It is the responsibility of the consumer of these channels
-	//	to provide any desired sorting mechanism.
+	// Messages are presented in the order received from the loggregator server. Chronological or
+	// other ordering is not guaranteed. It is the responsibility of the consumer of these channels
+	// to provide any desired sorting mechanism.
 	TailingLogs(appGuid string, authToken string) (<-chan *events.Envelope, error)
 
-	/*
-		Stream listens indefinitely for log and event messages. It returns two channels; the first is populated
-		with log and event messages, while the second contains errors (e.g. from parsing messages). It returns immediately.
-		Call Close() to terminate the connection when you are finished listening.
 
-		Messages are presented in the order received from the loggregator server. Chronological or other ordering
-		is not guaranteed. It is the responsibility of the consumer of these channels to provide any desired sorting
-		mechanism.
-	*/
+	// Stream listens indefinitely for log and event messages. It returns two channels; the first is populated
+	// with log and event messages, while the second contains errors (e.g. from parsing messages). It returns immediately.
+	// Call Close() to terminate the connection when you are finished listening.
+	//
+	// Messages are presented in the order received from the loggregator server. Chronological or other ordering
+	// is not guaranteed. It is the responsibility of the consumer of these channels to provide any desired sorting
+	// mechanism.
 	Stream(appGuid string, authToken string) (<-chan *events.Envelope, error)
 
-	/*
-	   Firehose streams all data.
-	*/
+
+	// Firehose streams all data. All clients with the same subscriptionId will receive a proportionate share of the
+	// message stream. Each pool of clients will receive the entire stream.
 	Firehose(subscriptionId, authToken string) (<-chan *events.Envelope, error)
 
-	//	Recent connects to traffic controller via its 'recent' endpoint and returns a slice of recent messages.
-	//	It does not guarantee any order of the messages; they are in the order returned by traffic controller.
+	// RecentLogs connects to traffic controller via its 'recentlogs' http(s) endpoint and returns a slice of recent messages.
+	// It does not guarantee any order of the messages; they are in the order returned by traffic controller.
 	//
-	//	The SortRecent method is provided to sort the data returned by this method.
+	// The SortRecent method is provided to sort the data returned by this method.
 	RecentLogs(appGuid string, authToken string) ([]*events.Envelope, error)
 
 	// Close terminates the websocket connection to traffic controller.
@@ -71,7 +69,7 @@ type Noaa interface {
 	// SetOnConnectCallback sets a callback function to be called with the websocket connection is established.
 	SetOnConnectCallback(func())
 
-	// SetDebugPrinter enables logging of the websocket handshake
+	// SetDebugPrinter enables logging of the websocket handshake.
 	SetDebugPrinter(DebugPrinter)
 }
 
@@ -94,27 +92,15 @@ type consumer struct {
 	debugPrinter         DebugPrinter
 }
 
-/* New creates a new consumer to a traffic controller.
- */
+// New creates a new consumer to a traffic controller.
 func NewNoaa(trafficControllerUrl string, tlsConfig *tls.Config, proxy func(*http.Request) (*url.URL, error)) Noaa {
 	return &consumer{trafficControllerUrl: trafficControllerUrl, tlsConfig: tlsConfig, proxy: proxy, debugPrinter: nullDebugPrinter{}}
 }
 
-/* SetDebugPrinter enables logging of the websocket handshake
- */
 func (cnsmr *consumer) SetDebugPrinter(debugPrinter DebugPrinter) {
 	cnsmr.debugPrinter = debugPrinter
 }
 
-/*
-TailingLogs listens indefinitely for log messages. It returns two channels; the first is populated
-with log messages, while the second contains errors (e.g. from parsing messages). It returns immediately.
-Call Close() to terminate the connection when you are finished listening.
-
-Messages are presented in the order received from the traffic controller server. Chronological or other ordering
-is not guaranteed. It is the responsibility of the consumer of these channels to provide any desired sorting
-mechanism.
-*/
 func (cnsmr *consumer) TailingLogs(appGuid string, authToken string) (<-chan *events.Envelope, error) {
 	eventsWithoutMetrics := make(chan *events.Envelope)
 
@@ -134,15 +120,6 @@ func (cnsmr *consumer) TailingLogs(appGuid string, authToken string) (<-chan *ev
 	return eventsWithoutMetrics, err
 }
 
-/*
-Stream listens indefinitely for log and event messages. It returns two channels; the first is populated
-with log and event messages, while the second contains errors (e.g. from parsing messages). It returns immediately.
-Call Close() to terminate the connection when you are finished listening.
-
-Messages are presented in the order received from the traffic controller server. Chronological or other ordering
-is not guaranteed. It is the responsibility of the consumer of these channels to provide any desired sorting
-mechanism.
-*/
 func (cnsmr *consumer) Stream(appGuid string, authToken string) (<-chan *events.Envelope, error) {
 	streamPath := fmt.Sprintf("/apps/%s/stream", appGuid)
 	return cnsmr.stream(streamPath, authToken)
@@ -169,15 +146,6 @@ func (cnsmr *consumer) stream(streamPath string, authToken string) (<-chan *even
 	return incomingChan, err
 }
 
-/*
-RecentLogs connects to traffic controller via its 'recentlogs' http(s) endpoint and returns a slice of recent messages.
-If the new http 'recentlogs' endpoint isn't supported (ie you are connecting to an older traffic controller server),
-we will fallback to the old Websocket 'dump' endpoint.
-
-It does not guarantee any order of the messages; they are in the order returned by traffic controller.
-
-The SortRecent method is provided to sort the data returned by this method.
-*/
 func (cnsmr *consumer) RecentLogs(appGuid string, authToken string) ([]*events.Envelope, error) {
 	messages, err := cnsmr.httpRecentLogs(appGuid, authToken)
 	if err != ErrBadRequest {
@@ -187,10 +155,8 @@ func (cnsmr *consumer) RecentLogs(appGuid string, authToken string) ([]*events.E
 	}
 }
 
-/*
-httpRecent connects to traffic controller via its 'recentlogs' http(s) endpoint and returns a slice of recent messages.
-It does not guarantee any order of the messages; they are in the order returned by traffic controller.
-*/
+// httpRecent connects to traffic controller via its 'recentlogs' http(s) endpoint and returns a slice of recent messages.
+// It does not guarantee any order of the messages; they are in the order returned by traffic controller.
 func (cnsmr *consumer) httpRecentLogs(appGuid string, authToken string) ([]*events.Envelope, error) {
 	trafficControllerUrl, err := url.ParseRequestURI(cnsmr.trafficControllerUrl)
 	if err != nil {
@@ -260,12 +226,11 @@ func (cnsmr *consumer) httpRecentLogs(appGuid string, authToken string) ([]*even
 	return messages, err
 }
 
-/*
-dump connects to traffic controller via its 'dump' ws(s) endpoint and returns a slice of recent messages. It does not
-guarantee any order of the messages; they are in the order returned by traffic controller.
 
-The SortRecent method is provided to sort the data returned by this method.
-*/
+// dump connects to traffic controller via its 'dump' ws(s) endpoint and returns a slice of recent messages. It does not
+// guarantee any order of the messages; they are in the order returned by traffic controller.
+//
+// The SortRecent method is provided to sort the data returned by this method.
 func (cnsmr *consumer) dump(appGuid string, authToken string) ([]*events.Envelope, error) {
 	var err error
 
@@ -299,8 +264,6 @@ drainLoop:
 	return messages, nil
 }
 
-/* Close terminates the websocket connection to traffic controller.
- */
 func (cnsmr *consumer) Close() error {
 	if cnsmr.ws == nil {
 		return errors.New("connection does not exist")
@@ -313,12 +276,11 @@ func (cnsmr *consumer) SetOnConnectCallback(cb func()) {
 	cnsmr.callback = cb
 }
 
-/*
-SortRecent sorts a slice of LogMessages by timestamp. The sort is stable, so
-messages with the same timestamp are sorted in the order that they are received.
 
-The input slice is sorted; the return value is simply a pointer to the same slice.
-*/
+// SortRecent sorts a slice of LogMessages by timestamp. The sort is stable, so messages with the same timestamp are sorted
+// in the order that they are received.
+//
+// The input slice is sorted; the return value is simply a pointer to the same slice.
 func SortRecent(messages []*events.Envelope) []*events.Envelope {
 	sort.Stable(logMessageSlice(messages))
 	return messages
