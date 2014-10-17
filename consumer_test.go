@@ -426,7 +426,7 @@ var _ = Describe("Noaa", func() {
 		})
 	})
 
-	Describe("RecentLogs with http", func() {
+	Describe("RecentLogs", func() {
 		var (
 			appGuid             = "appGuid"
 			authToken           = "authToken"
@@ -700,78 +700,6 @@ var _ = Describe("Noaa", func() {
 
 					Expect(err).NotTo(HaveOccurred())
 				})
-			})
-		})
-	})
-
-	Describe("RecentLogs", func() {
-		var (
-			appGuid     string
-			authToken   string
-			logMessages []*events.Envelope
-			recentError error
-		)
-
-		perform := func() {
-			close(messagesToSend)
-			connection = noaa.NewNoaa(trafficControllerUrl, nil, nil)
-			logMessages, recentError = connection.RecentLogs(appGuid, authToken)
-		}
-
-		BeforeEach(func() {
-			fakeHandler = &FakeHandler{innerHandler: handlers.NewWebsocketHandler(messagesToSend, 100*time.Millisecond, loggertesthelper.Logger())}
-			testServer = httptest.NewServer(fakeHandler)
-			trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
-		})
-
-		Context("when the connection cannot be established", func() {
-			It("returns an error", func() {
-				trafficControllerUrl = "invalid-url"
-				perform()
-
-				Expect(recentError).ToNot(BeNil())
-			})
-		})
-
-		Context("when the connection can be established", func() {
-			It("connects to the loggregator server", func() {
-				perform()
-
-				Expect(fakeHandler.wasCalled()).To(BeTrue())
-			})
-
-			It("returns messages from the server", func() {
-				messagesToSend <- marshalMessage(createMessage("test-message-0", 0))
-				messagesToSend <- marshalMessage(createMessage("test-message-1", 0))
-				perform()
-
-				Expect(logMessages).To(HaveLen(2))
-				Expect(logMessages[0].GetLogMessage().GetMessage()).To(Equal([]byte("test-message-0")))
-				Expect(logMessages[1].GetLogMessage().GetMessage()).To(Equal([]byte("test-message-1")))
-			})
-
-			It("calls the right path on the traffic controller url", func() {
-				appGuid = "app-guid"
-				perform()
-
-				Expect(fakeHandler.getLastURL()).To(ContainSubstring("/dump/?app=app-guid"))
-			})
-		})
-
-		Context("when the authorization fails", func() {
-			var failer authFailer
-
-			BeforeEach(func() {
-				failer = authFailer{Message: "Helpful message"}
-				testServer = httptest.NewServer(failer)
-				trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
-			})
-
-			It("it returns a helpful error message", func() {
-				perform()
-
-				Expect(recentError).To(HaveOccurred())
-				Expect(recentError.Error()).To(ContainSubstring("You are not authorized. Helpful message"))
 			})
 		})
 	})

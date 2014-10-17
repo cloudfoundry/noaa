@@ -147,17 +147,6 @@ func (cnsmr *consumer) stream(streamPath string, authToken string) (<-chan *even
 }
 
 func (cnsmr *consumer) RecentLogs(appGuid string, authToken string) ([]*events.Envelope, error) {
-	messages, err := cnsmr.httpRecentLogs(appGuid, authToken)
-	if err != ErrBadRequest {
-		return messages, err
-	} else {
-		return cnsmr.dump(appGuid, authToken)
-	}
-}
-
-// httpRecent connects to traffic controller via its 'recentlogs' http(s) endpoint and returns a slice of recent messages.
-// It does not guarantee any order of the messages; they are in the order returned by traffic controller.
-func (cnsmr *consumer) httpRecentLogs(appGuid string, authToken string) ([]*events.Envelope, error) {
 	trafficControllerUrl, err := url.ParseRequestURI(cnsmr.trafficControllerUrl)
 	if err != nil {
 		return nil, err
@@ -224,44 +213,6 @@ func (cnsmr *consumer) httpRecentLogs(appGuid string, authToken string) ([]*even
 	}
 
 	return messages, err
-}
-
-
-// dump connects to traffic controller via its 'dump' ws(s) endpoint and returns a slice of recent messages. It does not
-// guarantee any order of the messages; they are in the order returned by traffic controller.
-//
-// The SortRecent method is provided to sort the data returned by this method.
-func (cnsmr *consumer) dump(appGuid string, authToken string) ([]*events.Envelope, error) {
-	var err error
-
-	dumpPath := fmt.Sprintf("/dump/?app=%s", appGuid)
-	cnsmr.ws, err = cnsmr.establishWebsocketConnection(dumpPath, authToken)
-
-	if err != nil {
-		return nil, err
-	}
-
-	messages := []*events.Envelope{}
-	messageChan := make(chan *events.Envelope)
-
-	go func() {
-		err = cnsmr.listenForMessages(messageChan)
-		close(messageChan)
-	}()
-
-drainLoop:
-	for {
-		select {
-		case msg, ok := <-messageChan:
-			if !ok {
-				break drainLoop
-			}
-
-			messages = append(messages, msg)
-		}
-	}
-
-	return messages, nil
 }
 
 func (cnsmr *consumer) Close() error {
