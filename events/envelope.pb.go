@@ -7,6 +7,7 @@ Package events is a generated protocol buffer package.
 
 It is generated from these files:
 	envelope.proto
+	error.proto
 	heartbeat.proto
 	http.proto
 	log.proto
@@ -34,6 +35,7 @@ const (
 	Envelope_LogMessage    Envelope_EventType = 5
 	Envelope_ValueMetric   Envelope_EventType = 6
 	Envelope_CounterEvent  Envelope_EventType = 7
+	Envelope_Error         Envelope_EventType = 8
 )
 
 var Envelope_EventType_name = map[int32]string{
@@ -44,6 +46,7 @@ var Envelope_EventType_name = map[int32]string{
 	5: "LogMessage",
 	6: "ValueMetric",
 	7: "CounterEvent",
+	8: "Error",
 }
 var Envelope_EventType_value = map[string]int32{
 	"Heartbeat":     1,
@@ -53,6 +56,7 @@ var Envelope_EventType_value = map[string]int32{
 	"LogMessage":    5,
 	"ValueMetric":   6,
 	"CounterEvent":  7,
+	"Error":         8,
 }
 
 func (x Envelope_EventType) Enum() *Envelope_EventType {
@@ -83,6 +87,7 @@ type Envelope struct {
 	LogMessage       *LogMessage         `protobuf:"bytes,8,opt,name=logMessage" json:"logMessage,omitempty"`
 	ValueMetric      *ValueMetric        `protobuf:"bytes,9,opt,name=valueMetric" json:"valueMetric,omitempty"`
 	CounterEvent     *CounterEvent       `protobuf:"bytes,10,opt,name=counterEvent" json:"counterEvent,omitempty"`
+	Error            *Error              `protobuf:"bytes,11,opt,name=error" json:"error,omitempty"`
 	XXX_unrecognized []byte              `json:"-"`
 }
 
@@ -156,6 +161,13 @@ func (m *Envelope) GetValueMetric() *ValueMetric {
 func (m *Envelope) GetCounterEvent() *CounterEvent {
 	if m != nil {
 		return m.CounterEvent
+	}
+	return nil
+}
+
+func (m *Envelope) GetError() *Error {
+	if m != nil {
+		return m.Error
 	}
 	return nil
 }
