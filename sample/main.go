@@ -12,7 +12,7 @@ var appGuid = os.Getenv("APP_GUID")
 var authToken = os.Getenv("CF_ACCESS_TOKEN")
 
 func main() {
-	connection := noaa.NewNoaa(DopplerAddress, &tls.Config{InsecureSkipVerify: true}, nil)
+	connection := noaa.NewConsumer(DopplerAddress, &tls.Config{InsecureSkipVerify: true}, nil)
 	connection.SetDebugPrinter(ConsoleDebugPrinter{})
 
 	messages, err := connection.RecentLogs(appGuid, authToken)

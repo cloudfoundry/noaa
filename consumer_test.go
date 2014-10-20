@@ -23,7 +23,7 @@ import (
 
 var _ = Describe("Noaa", func() {
 	var (
-		connection           noaa.Noaa
+		connection           *noaa.Consumer
 		trafficControllerUrl string
 		testServer           *httptest.Server
 		fakeHandler          *FakeHandler
@@ -64,7 +64,7 @@ var _ = Describe("Noaa", func() {
 			called := false
 			cb := func() { called = true }
 
-			connection = noaa.NewNoaa(trafficControllerUrl, tlsSettings, nil)
+			connection = noaa.NewConsumer(trafficControllerUrl, tlsSettings, nil)
 			connection.SetOnConnectCallback(cb)
 			connection.TailingLogs(appGuid, authToken)
 
@@ -78,7 +78,7 @@ var _ = Describe("Noaa", func() {
 				called := false
 				cb := func() { called = true }
 
-				connection = noaa.NewNoaa(trafficControllerUrl, tlsSettings, nil)
+				connection = noaa.NewConsumer(trafficControllerUrl, tlsSettings, nil)
 				connection.SetOnConnectCallback(cb)
 				connection.TailingLogs(appGuid, authToken)
 
@@ -100,7 +100,7 @@ var _ = Describe("Noaa", func() {
 				called := false
 				cb := func() { called = true }
 
-				connection = noaa.NewNoaa(trafficControllerUrl, tlsSettings, nil)
+				connection = noaa.NewConsumer(trafficControllerUrl, tlsSettings, nil)
 				connection.SetOnConnectCallback(cb)
 				connection.TailingLogs(appGuid, authToken)
 
@@ -124,7 +124,7 @@ var _ = Describe("Noaa", func() {
 			startFakeTrafficController()
 
 			debugPrinter = &fakeDebugPrinter{}
-			connection = noaa.NewNoaa(trafficControllerUrl, tlsSettings, consumerProxyFunc)
+			connection = noaa.NewConsumer(trafficControllerUrl, tlsSettings, consumerProxyFunc)
 			connection.SetDebugPrinter(debugPrinter)
 		})
 
@@ -146,9 +146,10 @@ var _ = Describe("Noaa", func() {
 	})
 
 	Describe("TailingLogs", func() {
+		var logMessageChan <-chan (*events.LogMessage)
 		perform := func() {
-			connection = noaa.NewNoaa(trafficControllerUrl, tlsSettings, consumerProxyFunc)
-			incomingChan, err = connection.TailingLogs(appGuid, authToken)
+			connection = noaa.NewConsumer(trafficControllerUrl, tlsSettings, consumerProxyFunc)
+			logMessageChan, err = connection.TailingLogs(appGuid, authToken)
 		}
 
 		BeforeEach(func() {
@@ -161,9 +162,9 @@ var _ = Describe("Noaa", func() {
 					messagesToSend <- marshalMessage(createMessage("hello", 0))
 
 					perform()
-					message := <-incomingChan
+					message := <-logMessageChan
 
-					Expect(message.GetLogMessage().GetMessage()).To(Equal([]byte("hello")))
+					Expect(message.GetMessage()).To(Equal([]byte("hello")))
 					close(messagesToSend)
 
 					close(done)
@@ -174,9 +175,9 @@ var _ = Describe("Noaa", func() {
 					messagesToSend <- marshalMessage(createMessage("hello", 0))
 
 					perform()
-					message := <-incomingChan
+					message := <-logMessageChan
 
-					Expect(message.GetLogMessage().GetMessage()).To(Equal([]byte("hello")))
+					Expect(message.GetMessage()).To(Equal([]byte("hello")))
 					close(messagesToSend)
 
 					close(done)
@@ -186,7 +187,7 @@ var _ = Describe("Noaa", func() {
 					perform()
 					close(messagesToSend)
 
-					Eventually(incomingChan).Should(BeClosed())
+					Eventually(logMessageChan).Should(BeClosed())
 
 					close(done)
 				})
@@ -214,9 +215,9 @@ var _ = Describe("Noaa", func() {
 						perform()
 						close(messagesToSend)
 
-						message := <-incomingChan
+						message := <-logMessageChan
 
-						Expect(message.GetLogMessage().GetMessage()).To(Equal([]byte("hello")))
+						Expect(message.GetMessage()).To(Equal([]byte("hello")))
 
 						close(done)
 					})
@@ -277,7 +278,7 @@ var _ = Describe("Noaa", func() {
 
 	Describe("Stream", func() {
 		perform := func() {
-			connection = noaa.NewNoaa(trafficControllerUrl, tlsSettings, consumerProxyFunc)
+			connection = noaa.NewConsumer(trafficControllerUrl, tlsSettings, consumerProxyFunc)
 			incomingChan, err = connection.Stream(appGuid, authToken)
 		}
 
@@ -401,7 +402,7 @@ var _ = Describe("Noaa", func() {
 
 		Context("when a connection is not open", func() {
 			It("returns an error", func() {
-				connection = noaa.NewNoaa(trafficControllerUrl, nil, nil)
+				connection = noaa.NewConsumer(trafficControllerUrl, nil, nil)
 				err := connection.Close()
 
 				Expect(err.Error()).To(Equal("connection does not exist"))
@@ -410,7 +411,7 @@ var _ = Describe("Noaa", func() {
 
 		Context("when a connection is open", func() {
 			It("closes any open channels", func(done Done) {
-				connection = noaa.NewNoaa(trafficControllerUrl, nil, nil)
+				connection = noaa.NewConsumer(trafficControllerUrl, nil, nil)
 				incomingChan, err := connection.TailingLogs("app-guid", "auth-token")
 				close(messagesToSend)
 
@@ -430,13 +431,13 @@ var _ = Describe("Noaa", func() {
 		var (
 			appGuid             = "appGuid"
 			authToken           = "authToken"
-			receivedLogMessages []*events.Envelope
+			receivedLogMessages []*events.LogMessage
 			recentError         error
 		)
 
 		perform := func() {
 			close(messagesToSend)
-			connection = noaa.NewNoaa(trafficControllerUrl, nil, nil)
+			connection = noaa.NewConsumer(trafficControllerUrl, nil, nil)
 			receivedLogMessages, recentError = connection.RecentLogs(appGuid, authToken)
 		}
 
@@ -464,8 +465,8 @@ var _ = Describe("Noaa", func() {
 
 				Expect(recentError).NotTo(HaveOccurred())
 				Expect(receivedLogMessages).To(HaveLen(2))
-				Expect(receivedLogMessages[0].GetLogMessage().GetMessage()).To(Equal([]byte("test-message-0")))
-				Expect(receivedLogMessages[1].GetLogMessage().GetMessage()).To(Equal([]byte("test-message-1")))
+				Expect(receivedLogMessages[0].GetMessage()).To(Equal([]byte("test-message-0")))
+				Expect(receivedLogMessages[1].GetMessage()).To(Equal([]byte("test-message-1")))
 			})
 		})
 
@@ -590,7 +591,7 @@ var _ = Describe("Noaa", func() {
 
 		Describe("Firehose", func() {
 			perform := func() {
-				connection = noaa.NewNoaa(trafficControllerUrl, tlsSettings, consumerProxyFunc)
+				connection = noaa.NewConsumer(trafficControllerUrl, tlsSettings, consumerProxyFunc)
 				incomingChan, err = connection.Firehose("subscription-id", authToken)
 			}
 
@@ -703,31 +704,6 @@ var _ = Describe("Noaa", func() {
 			})
 		})
 	})
-
-	Describe("SortRecent", func() {
-		var messages []*events.Envelope
-
-		BeforeEach(func() {
-			messages = []*events.Envelope{createMessage("hello", 2), createMessage("konnichiha", 1)}
-		})
-
-		It("sorts messages", func() {
-			sortedMessages := noaa.SortRecent(messages)
-
-			Expect(*sortedMessages[0].Timestamp).To(Equal(int64(1)))
-			Expect(*sortedMessages[1].Timestamp).To(Equal(int64(2)))
-		})
-
-		It("sorts using a stable algorithm", func() {
-			messages = append(messages, createMessage("guten tag", 1))
-
-			sortedMessages := noaa.SortRecent(messages)
-
-			Expect(sortedMessages[0].GetLogMessage().GetMessage()).To(Equal([]byte("konnichiha")))
-			Expect(sortedMessages[1].GetLogMessage().GetMessage()).To(Equal([]byte("guten tag")))
-			Expect(sortedMessages[2].GetLogMessage().GetMessage()).To(Equal([]byte("hello")))
-		})
-	})
 })
 
 func createMessage(message string, timestamp int64) *events.Envelope {
@@ -735,14 +711,7 @@ func createMessage(message string, timestamp int64) *events.Envelope {
 		timestamp = time.Now().UnixNano()
 	}
 
-	logMessageType := events.LogMessage_OUT
-	logMessage := &events.LogMessage{
-		Message:     []byte(message),
-		MessageType: &logMessageType,
-		AppId:       proto.String("my-app-guid"),
-		SourceType:  proto.String("DEA"),
-		Timestamp:   proto.Int64(timestamp),
-	}
+	logMessage := createLogMessage(message, timestamp)
 
 	eventType := events.Envelope_LogMessage
 	return &events.Envelope{
@@ -750,6 +719,16 @@ func createMessage(message string, timestamp int64) *events.Envelope {
 		EventType:  &eventType,
 		Origin:     proto.String("fake-origin-1"),
 		Timestamp:  proto.Int64(timestamp),
+	}
+}
+
+func createLogMessage(message string, timestamp int64) *events.LogMessage {
+	return &events.LogMessage{
+		Message:     []byte(message),
+		MessageType: events.LogMessage_OUT.Enum(),
+		AppId:       proto.String("my-app-guid"),
+		SourceType:  proto.String("DEA"),
+		Timestamp:   proto.Int64(timestamp),
 	}
 }
 
