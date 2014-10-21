@@ -24,6 +24,7 @@ import (
 var (
 	// KeepAlive sets the interval between keep-alive messages sent by the client to loggregator.
 	KeepAlive         = 25 * time.Second
+	reconnectTimeout  = 500 * time.Millisecond
 	boundaryRegexp    = regexp.MustCompile("boundary=(.*)")
 	ErrNotFound       = errors.New("/recent path not found or has issues")
 	ErrBadResponse    = errors.New("bad server response")
@@ -46,14 +47,41 @@ func NewConsumer(trafficControllerUrl string, tlsConfig *tls.Config, proxy func(
 	return &Consumer{trafficControllerUrl: trafficControllerUrl, tlsConfig: tlsConfig, proxy: proxy, debugPrinter: nullDebugPrinter{}}
 }
 
-// TailingLogs listens indefinitely for log messages. It returns two channels; the first is populated
+// TailingLogs behaves exactly as TailingLogsOnce, except that it retries 5 times if the connection
+// to the remote server is lost.
+func (cnsmr *Consumer) TailingLogs(appGuid string, authToken string) (<-chan *events.LogMessage, <-chan *events.Error) {
+	logMessages := make(chan *events.LogMessage)
+	errChan := make(chan *events.Error, 5)
+
+	go func() {
+		defer close(errChan)
+		defer close(logMessages)
+
+		for i := 0; i < 5; i++ {
+			logs, errs := cnsmr.TailingLogsOnce(appGuid, authToken)
+
+			for log := range logs {
+				logMessages <- log
+				i = 0
+			}
+
+			err := <-errs
+			errChan <- err
+			time.Sleep(reconnectTimeout)
+		}
+	}()
+
+	return logMessages, errChan
+}
+
+// TailingLogsOnce listens indefinitely for log messages. It returns two channels; the first is populated
 // with log messages, while the second contains errors (e.g. from parsing messages). It returns
 // immediately. Call Close() to terminate the connection when you are finished listening.
 //
 // Messages are presented in the order received from the loggregator server. Chronological or
 // other ordering is not guaranteed. It is the responsibility of the consumer of these channels
 // to provide any desired sorting mechanism.
-func (cnsmr *Consumer) TailingLogs(appGuid string, authToken string) (<-chan *events.LogMessage, <-chan *events.Error) {
+func (cnsmr *Consumer) TailingLogsOnce(appGuid string, authToken string) (<-chan *events.LogMessage, <-chan *events.Error) {
 	logMessages := make(chan *events.LogMessage)
 	errChan := make(chan *events.Error, 1)
 
@@ -69,8 +97,11 @@ func (cnsmr *Consumer) TailingLogs(appGuid string, authToken string) (<-chan *ev
 			case events.Envelope_LogMessage:
 				logMessages <- event.GetLogMessage()
 			case events.Envelope_Error:
-				errChan <- event.GetError()
-				return
+				err := event.GetError()
+				if err.GetSource() == "NOAA" {
+					errChan <- err
+					return
+				}
 			}
 		}
 	}()
