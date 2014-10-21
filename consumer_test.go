@@ -2,20 +2,21 @@ package noaa_test
 
 import (
 	"bytes"
-	"code.google.com/p/gogoprotobuf/proto"
 	"crypto/tls"
 	"fmt"
-	"github.com/cloudfoundry/loggregatorlib/loggertesthelper"
-	"github.com/cloudfoundry/loggregatorlib/server/handlers"
-	"github.com/cloudfoundry/noaa"
-	noaa_errors "github.com/cloudfoundry/noaa/errors"
-	"github.com/cloudfoundry/noaa/events"
 	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"sync"
 	"time"
+
+	"code.google.com/p/gogoprotobuf/proto"
+	"github.com/cloudfoundry/loggregatorlib/loggertesthelper"
+	"github.com/cloudfoundry/loggregatorlib/server/handlers"
+	"github.com/cloudfoundry/noaa"
+	noaa_errors "github.com/cloudfoundry/noaa/errors"
+	"github.com/cloudfoundry/noaa/events"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -146,10 +147,11 @@ var _ = Describe("Noaa", func() {
 	})
 
 	Describe("TailingLogs", func() {
-		var logMessageChan <-chan (*events.LogMessage)
+		var logMessageChan <-chan *events.LogMessage
+		var errorChan <-chan *events.Error
 		perform := func() {
 			connection = noaa.NewConsumer(trafficControllerUrl, tlsSettings, consumerProxyFunc)
-			logMessageChan, err = connection.TailingLogs(appGuid, authToken)
+			logMessageChan, errorChan = connection.TailingLogs(appGuid, authToken)
 		}
 
 		BeforeEach(func() {
@@ -208,6 +210,21 @@ var _ = Describe("Noaa", func() {
 					Eventually(fakeHandler.getAuthHeader).Should(Equal("auth-token"))
 				})
 
+				Context("when remote connection dies unexpectedly", func() {
+					It("receives a message on the error channel", func(done Done) {
+						perform()
+						close(messagesToSend)
+
+						var err *events.Error
+						Eventually(errorChan).Should(Receive(&err))
+
+						Expect(err.GetCode()).To(Equal(noaa_errors.ERR_LOST_CONNECTION))
+						Expect(err.GetMessage()).To(Equal("EOF"))
+
+						close(done)
+					})
+				})
+
 				Context("when the message fails to parse", func() {
 					It("skips that message but continues to read messages", func(done Done) {
 						messagesToSend <- []byte{0}
@@ -229,11 +246,13 @@ var _ = Describe("Noaa", func() {
 					trafficControllerUrl = "!!!bad-url"
 				})
 
-				It("returns an error", func(done Done) {
+				It("receives an error on errChan", func(done Done) {
 					perform()
 
-					Expect(err).To(HaveOccurred())
-					Expect(err.Error()).To(ContainSubstring("Please ask your Cloud Foundry Operator"))
+					var err *events.Error
+					Eventually(errorChan).Should(Receive(&err))
+					Expect(err.GetCode()).To(Equal(noaa_errors.ERR_DIAL))
+					Expect(err.GetMessage()).To(ContainSubstring("Please ask your Cloud Foundry Operator"))
 
 					close(done)
 				})
@@ -251,9 +270,10 @@ var _ = Describe("Noaa", func() {
 				It("it returns a helpful error message", func() {
 					perform()
 
-					Expect(err).To(HaveOccurred())
-					Expect(err.Error()).To(ContainSubstring("You are not authorized. Helpful message"))
-					Expect(err).To(BeAssignableToTypeOf(&noaa_errors.UnauthorizedError{}))
+					var err *events.Error
+					Eventually(errorChan).Should(Receive(&err))
+					Expect(err.GetCode()).To(Equal(noaa_errors.ERR_DIAL))
+					Expect(err.GetMessage()).To(ContainSubstring("You are not authorized. Helpful message"))
 				})
 			})
 		})
@@ -279,7 +299,7 @@ var _ = Describe("Noaa", func() {
 	Describe("Stream", func() {
 		perform := func() {
 			connection = noaa.NewConsumer(trafficControllerUrl, tlsSettings, consumerProxyFunc)
-			incomingChan, err = connection.Stream(appGuid, authToken)
+			incomingChan = connection.Stream(appGuid, authToken)
 		}
 
 		BeforeEach(func() {
@@ -349,8 +369,12 @@ var _ = Describe("Noaa", func() {
 				It("returns an error", func(done Done) {
 					perform()
 
-					Expect(err).To(HaveOccurred())
-					Expect(err.Error()).To(ContainSubstring("Please ask your Cloud Foundry Operator"))
+					var errorEnvelope *events.Envelope
+					Eventually(incomingChan).Should(Receive(&errorEnvelope))
+					err := errorEnvelope.GetError()
+					Expect(err).ToNot(BeNil())
+					Expect(err.GetSource()).To(Equal("NOAA"))
+					Expect(err.GetMessage()).To(ContainSubstring("Please ask your Cloud Foundry Operator"))
 
 					close(done)
 				})
@@ -368,9 +392,12 @@ var _ = Describe("Noaa", func() {
 				It("it returns a helpful error message", func() {
 					perform()
 
-					Expect(err).To(HaveOccurred())
-					Expect(err.Error()).To(ContainSubstring("You are not authorized. Helpful message"))
-					Expect(err).To(BeAssignableToTypeOf(&noaa_errors.UnauthorizedError{}))
+					var errorEnvelope *events.Envelope
+					Eventually(incomingChan).Should(Receive(&errorEnvelope))
+					err := errorEnvelope.GetError()
+					Expect(err).ToNot(BeNil())
+					Expect(err.GetSource()).To(Equal("NOAA"))
+					Expect(err.GetMessage()).To(ContainSubstring("You are not authorized. Helpful message"))
 				})
 			})
 		})
@@ -412,14 +439,14 @@ var _ = Describe("Noaa", func() {
 		Context("when a connection is open", func() {
 			It("closes any open channels", func(done Done) {
 				connection = noaa.NewConsumer(trafficControllerUrl, nil, nil)
-				incomingChan, err := connection.TailingLogs("app-guid", "auth-token")
+				incomingChan, errChan := connection.TailingLogs("app-guid", "auth-token")
 				close(messagesToSend)
 
 				Eventually(fakeHandler.wasCalled).Should(BeTrue())
 
 				connection.Close()
 
-				Expect(err).NotTo(HaveOccurred())
+				Expect(errChan).NotTo(Receive())
 				Eventually(incomingChan).Should(BeClosed())
 
 				close(done)
@@ -592,7 +619,7 @@ var _ = Describe("Noaa", func() {
 		Describe("Firehose", func() {
 			perform := func() {
 				connection = noaa.NewConsumer(trafficControllerUrl, tlsSettings, consumerProxyFunc)
-				incomingChan, err = connection.Firehose("subscription-id", authToken)
+				incomingChan = connection.Firehose("subscription-id", authToken)
 			}
 
 			BeforeEach(func() {
@@ -661,8 +688,12 @@ var _ = Describe("Noaa", func() {
 					It("returns an error", func(done Done) {
 						perform()
 
-						Expect(err).To(HaveOccurred())
-						Expect(err.Error()).To(ContainSubstring("Please ask your Cloud Foundry Operator"))
+						var errorEnvelope *events.Envelope
+						Eventually(incomingChan).Should(Receive(&errorEnvelope))
+						err := errorEnvelope.GetError()
+						Expect(err).ToNot(BeNil())
+						Expect(err.GetSource()).To(Equal("NOAA"))
+						Expect(err.GetMessage()).To(ContainSubstring("Please ask your Cloud Foundry Operator"))
 
 						close(done)
 					})
@@ -680,9 +711,12 @@ var _ = Describe("Noaa", func() {
 					It("it returns a helpful error message", func() {
 						perform()
 
-						Expect(err).To(HaveOccurred())
-						Expect(err.Error()).To(ContainSubstring("You are not authorized. Helpful message"))
-						Expect(err).To(BeAssignableToTypeOf(&noaa_errors.UnauthorizedError{}))
+						var errorEnvelope *events.Envelope
+						Eventually(incomingChan).Should(Receive(&errorEnvelope))
+						err := errorEnvelope.GetError()
+						Expect(err).ToNot(BeNil())
+						Expect(err.GetSource()).To(Equal("NOAA"))
+						Expect(err.GetMessage()).To(ContainSubstring("You are not authorized. Helpful message"))
 					})
 				})
 			})

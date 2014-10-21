@@ -3,13 +3,9 @@ package noaa
 import (
 	"bufio"
 	"bytes"
-	"code.google.com/p/gogoprotobuf/proto"
 	"crypto/tls"
 	"errors"
 	"fmt"
-	noaa_errors "github.com/cloudfoundry/noaa/errors"
-	"github.com/cloudfoundry/noaa/events"
-	"github.com/gorilla/websocket"
 	"io/ioutil"
 	"mime/multipart"
 	"net"
@@ -18,15 +14,21 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"code.google.com/p/gogoprotobuf/proto"
+	noaa_errors "github.com/cloudfoundry/noaa/errors"
+	"github.com/cloudfoundry/noaa/events"
+	"github.com/gorilla/websocket"
 )
 
 var (
 	// KeepAlive sets the interval between keep-alive messages sent by the client to loggregator.
-	KeepAlive      = 25 * time.Second
-	boundaryRegexp = regexp.MustCompile("boundary=(.*)")
-	ErrNotFound    = errors.New("/recent path not found or has issues")
-	ErrBadResponse = errors.New("bad server response")
-	ErrBadRequest  = errors.New("bad client request")
+	KeepAlive         = 25 * time.Second
+	boundaryRegexp    = regexp.MustCompile("boundary=(.*)")
+	ErrNotFound       = errors.New("/recent path not found or has issues")
+	ErrBadResponse    = errors.New("bad server response")
+	ErrBadRequest     = errors.New("bad client request")
+	ErrLostConnection = errors.New("remote server terminated connection unexpectedly")
 )
 
 // Consumer represents the actions that can be performed against traffic controller.
@@ -51,23 +53,29 @@ func NewConsumer(trafficControllerUrl string, tlsConfig *tls.Config, proxy func(
 // Messages are presented in the order received from the loggregator server. Chronological or
 // other ordering is not guaranteed. It is the responsibility of the consumer of these channels
 // to provide any desired sorting mechanism.
-func (cnsmr *Consumer) TailingLogs(appGuid string, authToken string) (<-chan *events.LogMessage, error) {
+func (cnsmr *Consumer) TailingLogs(appGuid string, authToken string) (<-chan *events.LogMessage, <-chan *events.Error) {
 	logMessages := make(chan *events.LogMessage)
+	errChan := make(chan *events.Error, 1)
 
 	streamPath := fmt.Sprintf("/apps/%s/stream", appGuid)
-	eventsWithMetrics, err := cnsmr.stream(streamPath, authToken)
+	eventsWithMetrics := cnsmr.stream(streamPath, authToken)
 
 	go func() {
+		defer close(logMessages)
+		defer close(errChan)
+
 		for event := range eventsWithMetrics {
-			if *event.EventType == events.Envelope_LogMessage {
-				logMessages <- event.LogMessage
+			switch *event.EventType {
+			case events.Envelope_LogMessage:
+				logMessages <- event.GetLogMessage()
+			case events.Envelope_Error:
+				errChan <- event.GetError()
+				return
 			}
 		}
-
-		close(logMessages)
 	}()
 
-	return logMessages, err
+	return logMessages, errChan
 }
 
 // Stream listens indefinitely for log and event messages. It returns two channels; the first is populated
@@ -77,32 +85,51 @@ func (cnsmr *Consumer) TailingLogs(appGuid string, authToken string) (<-chan *ev
 // Messages are presented in the order received from the loggregator server. Chronological or other ordering
 // is not guaranteed. It is the responsibility of the consumer of these channels to provide any desired sorting
 // mechanism.
-func (cnsmr *Consumer) Stream(appGuid string, authToken string) (<-chan *events.Envelope, error) {
+func (cnsmr *Consumer) Stream(appGuid string, authToken string) <-chan *events.Envelope {
 	streamPath := fmt.Sprintf("/apps/%s/stream", appGuid)
 	return cnsmr.stream(streamPath, authToken)
 }
 
 // Firehose streams all data. All clients with the same subscriptionId will receive a proportionate share of the
 // message stream. Each pool of clients will receive the entire stream.
-func (cnsmr *Consumer) Firehose(subscriptionId string, authToken string) (<-chan *events.Envelope, error) {
+func (cnsmr *Consumer) Firehose(subscriptionId string, authToken string) <-chan *events.Envelope {
 	streamPath := "/firehose/" + subscriptionId
 	return cnsmr.stream(streamPath, authToken)
 }
 
-func (cnsmr *Consumer) stream(streamPath string, authToken string) (<-chan *events.Envelope, error) {
-	incomingChan := make(chan *events.Envelope)
+func (cnsmr *Consumer) stream(streamPath string, authToken string) <-chan *events.Envelope {
+	incomingChan := make(chan *events.Envelope, 1)
 	var err error
 
 	cnsmr.ws, err = cnsmr.establishWebsocketConnection(streamPath, authToken)
 
-	if err == nil {
-		go func() {
-			defer close(incomingChan)
-			cnsmr.listenForMessages(incomingChan)
-		}()
+	if err != nil {
+		incomingChan <- makeError(err, noaa_errors.ERR_DIAL)
+		close(incomingChan)
+		return incomingChan
 	}
 
-	return incomingChan, err
+	go func() {
+		defer close(incomingChan)
+
+		err := cnsmr.listenForMessages(incomingChan)
+		if err != nil {
+			incomingChan <- makeError(err, noaa_errors.ERR_LOST_CONNECTION)
+		}
+	}()
+
+	return incomingChan
+}
+
+func makeError(err error, code int32) *events.Envelope {
+	return &events.Envelope{
+		EventType: events.Envelope_Error.Enum(),
+		Error: &events.Error{
+			Source:  proto.String("NOAA"),
+			Code:    &code,
+			Message: proto.String(err.Error()),
+		},
+	}
 }
 
 // RecentLogs connects to traffic controller via its 'recentlogs' http(s) endpoint and returns a slice of recent messages.

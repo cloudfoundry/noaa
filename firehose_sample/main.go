@@ -3,8 +3,9 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/cloudfoundry/noaa"
 	"os"
+
+	"github.com/cloudfoundry/noaa"
 )
 
 var authToken = os.Getenv("CF_ACCESS_TOKEN")
@@ -17,14 +18,10 @@ func main() {
 	connection.SetDebugPrinter(ConsoleDebugPrinter{})
 
 	fmt.Println("===== Streaming Firehose (will only succeed if you have admin credentials)")
-	msgChan, err := connection.Firehose(firehoseSubscriptionId, authToken)
+	msgChan := connection.Firehose(firehoseSubscriptionId, authToken)
 
-	if err != nil {
-		fmt.Printf("===== Error streaming: %v\n", err)
-	} else {
-		for msg := range msgChan {
-			fmt.Printf("%v \n", msg)
-		}
+	for msg := range msgChan {
+		fmt.Printf("%v \n", msg)
 	}
 }
 

@@ -3,8 +3,9 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/cloudfoundry/noaa"
 	"os"
+
+	"github.com/cloudfoundry/noaa"
 )
 
 var DopplerAddress = "wss://doppler.10.244.0.34.xip.io:443"
@@ -27,14 +28,10 @@ func main() {
 	}
 
 	fmt.Println("===== Streaming metrics")
-	msgChan, err := connection.Stream(appGuid, authToken)
+	msgChan := connection.Stream(appGuid, authToken)
 
-	if err != nil {
-		fmt.Printf("===== Error streaming: %v\n", err)
-	} else {
-		for msg := range msgChan {
-			fmt.Printf("%v \n", msg)
-		}
+	for msg := range msgChan {
+		fmt.Printf("%v \n", msg)
 	}
 }
 
