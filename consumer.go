@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"code.google.com/p/gogoprotobuf/proto"
@@ -40,6 +41,7 @@ type Consumer struct {
 	callback             func()
 	proxy                func(*http.Request) (*url.URL, error)
 	debugPrinter         DebugPrinter
+	sync.RWMutex
 }
 
 // NewConsumer creates a new consumer to a traffic controller.
@@ -138,7 +140,9 @@ func (cnsmr *Consumer) FirehoseWithoutReconnect(subscriptionId string, authToken
 func (cnsmr *Consumer) stream(streamPath string, authToken string, outputChan chan<- *events.Envelope) error {
 	var err error
 
+	cnsmr.Lock()
 	cnsmr.ws, err = cnsmr.establishWebsocketConnection(streamPath, authToken)
+	cnsmr.Unlock()
 
 	if err != nil {
 		return err
@@ -233,6 +237,8 @@ func (cnsmr *Consumer) RecentLogs(appGuid string, authToken string) ([]*events.L
 
 // Close terminates the websocket connection to traffic controller.
 func (cnsmr *Consumer) Close() error {
+	cnsmr.Lock()
+	defer cnsmr.Unlock()
 	if cnsmr.ws == nil {
 		return errors.New("connection does not exist")
 	}

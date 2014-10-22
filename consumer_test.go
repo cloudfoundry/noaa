@@ -68,7 +68,7 @@ var _ = Describe("Noaa", func() {
 			connection.SetOnConnectCallback(cb)
 
 			logChan := make(chan *events.LogMessage, 100)
-			go connection.TailingLogsWithoutReconnect(appGuid, authToken, logChan)
+			connection.TailingLogsWithoutReconnect(appGuid, authToken, logChan)
 
 			Eventually(func() bool { return called }).Should(BeTrue())
 		})
@@ -83,7 +83,7 @@ var _ = Describe("Noaa", func() {
 				connection = noaa.NewConsumer(trafficControllerUrl, tlsSettings, nil)
 				connection.SetOnConnectCallback(cb)
 				logChan := make(chan *events.LogMessage, 100)
-				go connection.TailingLogsWithoutReconnect(appGuid, authToken, logChan)
+				connection.TailingLogsWithoutReconnect(appGuid, authToken, logChan)
 
 				Consistently(func() bool { return called }).Should(BeFalse())
 			})
@@ -106,7 +106,7 @@ var _ = Describe("Noaa", func() {
 				connection = noaa.NewConsumer(trafficControllerUrl, tlsSettings, nil)
 				connection.SetOnConnectCallback(cb)
 				logChan := make(chan *events.LogMessage, 100)
-				go connection.TailingLogsWithoutReconnect(appGuid, authToken, logChan)
+				connection.TailingLogsWithoutReconnect(appGuid, authToken, logChan)
 
 				Consistently(func() bool { return called }).Should(BeFalse())
 			})
@@ -142,7 +142,7 @@ var _ = Describe("Noaa", func() {
 			fakeHandler.Close()
 
 			logChan := make(chan *events.LogMessage, 100)
-			go connection.TailingLogsWithoutReconnect(appGuid, authToken, logChan)
+			connection.TailingLogsWithoutReconnect(appGuid, authToken, logChan)
 
 			Eventually(func() int { return len(debugPrinter.Messages) }).Should(BeNumerically(">=", 1))
 			Expect(debugPrinter.Messages[0].Body).To(ContainSubstring("Sec-WebSocket-Version: 13"))
@@ -153,7 +153,7 @@ var _ = Describe("Noaa", func() {
 
 			fakeHandler.Close()
 			logChan := make(chan *events.LogMessage, 100)
-			go connection.TailingLogsWithoutReconnect(appGuid, authToken, logChan)
+			connection.TailingLogsWithoutReconnect(appGuid, authToken, logChan)
 
 			Eventually(func() int { return len(debugPrinter.Messages) }).Should(BeNumerically(">=", 1))
 			Expect(debugPrinter.Messages[0].Body).ToNot(ContainSubstring("hello"))
@@ -163,18 +163,27 @@ var _ = Describe("Noaa", func() {
 	Describe("TailingLogsWithoutReconnect", func() {
 		var logMessageChan chan *events.LogMessage
 		var errorChan chan error
+		var finishedChan chan struct{}
+
 		perform := func() {
 			connection = noaa.NewConsumer(trafficControllerUrl, tlsSettings, consumerProxyFunc)
 
-			errorChan = make(chan error)
+			errorChan = make(chan error, 10)
 			logMessageChan = make(chan *events.LogMessage)
 			go func() {
 				errorChan <- connection.TailingLogsWithoutReconnect(appGuid, authToken, logMessageChan)
+				close(finishedChan)
 			}()
 		}
 
 		BeforeEach(func() {
+			finishedChan = make(chan struct{})
 			startFakeTrafficController()
+		})
+
+		AfterEach(func() {
+			connection.Close()
+			<-finishedChan
 		})
 
 		Context("when there is no TLS Config or consumerProxyFunc setting", func() {
@@ -399,17 +408,26 @@ var _ = Describe("Noaa", func() {
 	Describe("StreamWithoutReconnect", func() {
 		var incomingChan chan *events.Envelope
 		var streamErrorChan chan error
+		var finishedChan chan struct{}
+
 		perform := func() {
-			streamErrorChan = make(chan error)
+			streamErrorChan = make(chan error, 10)
 			connection = noaa.NewConsumer(trafficControllerUrl, tlsSettings, consumerProxyFunc)
 			go func() {
 				streamErrorChan <- connection.StreamWithoutReconnect(appGuid, authToken, incomingChan)
+				close(finishedChan)
 			}()
 		}
 
 		BeforeEach(func() {
 			incomingChan = make(chan *events.Envelope)
+			finishedChan = make(chan struct{})
 			startFakeTrafficController()
+		})
+
+		AfterEach(func() {
+			connection.Close()
+			<-finishedChan
 		})
 
 		Context("when there is no TLS Config or consumerProxyFunc setting", func() {
@@ -871,20 +889,29 @@ var _ = Describe("Noaa", func() {
 			close(done)
 		}, 10)
 	})
+
 	Describe("FirehoseWithoutReconnect", func() {
 		var incomingChan chan *events.Envelope
 		var streamErrorChan chan error
+		var finishedChan chan struct{}
+
 		perform := func() {
-			streamErrorChan = make(chan error)
+			streamErrorChan = make(chan error, 10)
 			connection = noaa.NewConsumer(trafficControllerUrl, tlsSettings, consumerProxyFunc)
 			go func() {
 				streamErrorChan <- connection.FirehoseWithoutReconnect("subscription-id", authToken, incomingChan)
+				close(finishedChan)
 			}()
 		}
 
 		BeforeEach(func() {
 			incomingChan = make(chan *events.Envelope)
+			finishedChan = make(chan struct{})
 			startFakeTrafficController()
+		})
+
+		AfterEach(func() {
+			<-finishedChan
 		})
 
 		Context("when there is no TLS Config or consumerProxyFunc setting", func() {

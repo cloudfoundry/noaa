@@ -64,13 +64,17 @@ var _ = Describe("Noaa behind a Proxy", func() {
 
 	Describe("StreamWithoutReconnect", func() {
 		var errorChan chan error
+		var finishedChan chan struct{}
+
 		BeforeEach(func() {
-			errorChan = make(chan error)
+			errorChan = make(chan error, 10)
+			finishedChan = make(chan struct{})
 			incomingChan = make(chan *events.Envelope)
 		})
 
 		AfterEach(func() {
 			close(messagesToSend)
+			<-finishedChan
 		})
 
 		perform := func() {
@@ -78,6 +82,7 @@ var _ = Describe("Noaa behind a Proxy", func() {
 
 			go func() {
 				errorChan <- connection.StreamWithoutReconnect(appGuid, authToken, incomingChan)
+				close(finishedChan)
 			}()
 		}
 
