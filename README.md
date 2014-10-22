@@ -8,7 +8,7 @@ NOAA is a client library to consume metric and log messages from Doppler.
 
 ##WARNING
 
-This library does not work with Go 1.3 through 1.3.2, due to a bug in the standard libraries.
+This library does not work with Go 1.3 through 1.3.3, due to a bug in the standard libraries.
 
 ##Usage
 

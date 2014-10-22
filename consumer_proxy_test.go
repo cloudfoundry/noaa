@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/cloudfoundry/loggregatorlib/loggertesthelper"
@@ -30,7 +31,7 @@ var _ = Describe("Noaa behind a Proxy", func() {
 
 		appGuid         string
 		authToken       string
-		incomingChan    <-chan *events.Envelope
+		incomingChan    chan *events.Envelope
 		messagesToSend  chan []byte
 		testProxyServer *httptest.Server
 		goProxyHandler  *goproxy.ProxyHttpServer
@@ -61,7 +62,12 @@ var _ = Describe("Noaa behind a Proxy", func() {
 		}
 	})
 
-	Describe("Stream", func() {
+	Describe("StreamWithoutReconnect", func() {
+		var errorChan chan error
+		BeforeEach(func() {
+			errorChan = make(chan error)
+			incomingChan = make(chan *events.Envelope)
+		})
 
 		AfterEach(func() {
 			close(messagesToSend)
@@ -69,7 +75,10 @@ var _ = Describe("Noaa behind a Proxy", func() {
 
 		perform := func() {
 			connection = noaa.NewConsumer(endpoint, tlsSettings, consumerProxyFunc)
-			incomingChan = connection.Stream(appGuid, authToken)
+
+			go func() {
+				errorChan <- connection.StreamWithoutReconnect(appGuid, authToken, incomingChan)
+			}()
 		}
 
 		It("connects using valid URL to running consumerProxyFunc server", func() {
@@ -86,12 +95,16 @@ var _ = Describe("Noaa behind a Proxy", func() {
 
 			perform()
 
-			var errorEnvelope *events.Envelope
-			Eventually(incomingChan).Should(Receive(&errorEnvelope))
-			err := errorEnvelope.GetError()
-			Expect(err).ToNot(BeNil())
-			Expect(err.GetSource()).To(Equal("NOAA"))
-			Expect(err.GetMessage()).To(ContainSubstring("connection refused"))
+			for {
+				select {
+				case err := <-errorChan:
+					if strings.Contains(err.Error(), "connection refused") {
+						return
+					}
+				case <-time.After(time.Second):
+					Fail("never received an error")
+				}
+			}
 		})
 
 		It("connects using invalid URL", func() {
@@ -102,12 +115,10 @@ var _ = Describe("Noaa behind a Proxy", func() {
 
 			perform()
 
-			var errorEnvelope *events.Envelope
-			Eventually(incomingChan).Should(Receive(&errorEnvelope))
-			err := errorEnvelope.GetError()
-			Expect(err).ToNot(BeNil())
-			Expect(err.GetSource()).To(Equal("NOAA"))
-			Expect(err.GetMessage()).To(ContainSubstring(errMsg))
+			var err error
+			Eventually(errorChan).Should(Receive(&err))
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(errMsg))
 		})
 
 		It("connects to a consumerProxyFunc server rejecting CONNECT requests", func() {
@@ -115,11 +126,10 @@ var _ = Describe("Noaa behind a Proxy", func() {
 
 			perform()
 
-			var errorEnvelope *events.Envelope
-			Eventually(incomingChan).Should(Receive(&errorEnvelope))
-			err := errorEnvelope.GetError()
-			Expect(err).ToNot(BeNil())
-			Expect(err.GetSource()).To(Equal("NOAA"))
+			var err error
+			Eventually(errorChan).Should(Receive(&err))
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("Error dialing traffic controller server"))
 		})
 
 		It("connects to a non-consumerProxyFunc server", func() {
@@ -132,12 +142,10 @@ var _ = Describe("Noaa behind a Proxy", func() {
 
 			perform()
 
-			var errorEnvelope *events.Envelope
-			Eventually(incomingChan).Should(Receive(&errorEnvelope))
-			err := errorEnvelope.GetError()
-			Expect(err).ToNot(BeNil())
-			Expect(err.GetSource()).To(Equal("NOAA"))
-			Expect(err.GetMessage()).To(ContainSubstring(http.StatusText(http.StatusBadRequest)))
+			var err error
+			Eventually(errorChan).Should(Receive(&err))
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(http.StatusText(http.StatusBadRequest)))
 		})
 	})
 

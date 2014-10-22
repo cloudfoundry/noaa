@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/cloudfoundry/noaa"
+	"github.com/cloudfoundry/noaa/events"
 )
 
 var authToken = os.Getenv("CF_ACCESS_TOKEN")
@@ -18,7 +19,17 @@ func main() {
 	connection.SetDebugPrinter(ConsoleDebugPrinter{})
 
 	fmt.Println("===== Streaming Firehose (will only succeed if you have admin credentials)")
-	msgChan := connection.Firehose(firehoseSubscriptionId, authToken)
+
+	msgChan := make(chan *events.Envelope)
+	go func() {
+		defer close(msgChan)
+		errorChan := make(chan error)
+		go connection.Firehose(firehoseSubscriptionId, authToken, msgChan, errorChan, nil)
+
+		for err := range errorChan {
+			fmt.Fprintf(os.Stderr, "%v\n", err.Error())
+		}
+	}()
 
 	for msg := range msgChan {
 		fmt.Printf("%v \n", msg)

@@ -47,109 +47,104 @@ func NewConsumer(trafficControllerUrl string, tlsConfig *tls.Config, proxy func(
 	return &Consumer{trafficControllerUrl: trafficControllerUrl, tlsConfig: tlsConfig, proxy: proxy, debugPrinter: nullDebugPrinter{}}
 }
 
-// TailingLogs behaves exactly as TailingLogsOnce, except that it retries 5 times if the connection
-// to the remote server is lost.
-func (cnsmr *Consumer) TailingLogs(appGuid string, authToken string) (<-chan *events.LogMessage, <-chan *events.Error) {
-	logMessages := make(chan *events.LogMessage)
-	errChan := make(chan *events.Error, 5)
+// TailingLogs behaves exactly as TailingLogsWithoutReconnect, except that it retries 5 times if the connection
+// to the remote server is lost and returns all errors from each attempt on errorChan.
+func (cnsmr *Consumer) TailingLogs(appGuid string, authToken string, outputChan chan<- *events.LogMessage, errorChan chan<- error, stopChan chan struct{}) {
+	action := func() error {
+		return cnsmr.TailingLogsWithoutReconnect(appGuid, authToken, outputChan)
+	}
 
-	go func() {
-		defer close(errChan)
-		defer close(logMessages)
-
-		for i := 0; i < 5; i++ {
-			logs, errs := cnsmr.TailingLogsOnce(appGuid, authToken)
-
-			for log := range logs {
-				logMessages <- log
-				i = 0
-			}
-
-			err := <-errs
-			errChan <- err
-			time.Sleep(reconnectTimeout)
-		}
-	}()
-
-	return logMessages, errChan
+	cnsmr.retryAction(action, errorChan, stopChan)
 }
 
-// TailingLogsOnce listens indefinitely for log messages. It returns two channels; the first is populated
-// with log messages, while the second contains errors (e.g. from parsing messages). It returns
-// immediately. Call Close() to terminate the connection when you are finished listening.
+// TailingLogsWithoutReconnect listens indefinitely for log messages only; other event types are dropped.
+//
+// If you wish to be able to terminate the listen early, run TailingLogsWithoutReconnect in a Goroutine and
+// call Close() when you are finished listening.
 //
 // Messages are presented in the order received from the loggregator server. Chronological or
 // other ordering is not guaranteed. It is the responsibility of the consumer of these channels
 // to provide any desired sorting mechanism.
-func (cnsmr *Consumer) TailingLogsOnce(appGuid string, authToken string) (<-chan *events.LogMessage, <-chan *events.Error) {
-	logMessages := make(chan *events.LogMessage)
-	errChan := make(chan *events.Error, 1)
+func (cnsmr *Consumer) TailingLogsWithoutReconnect(appGuid string, authToken string, outputChan chan<- *events.LogMessage) error {
+	allEvents := make(chan *events.Envelope)
 
 	streamPath := fmt.Sprintf("/apps/%s/stream", appGuid)
-	eventsWithMetrics := cnsmr.stream(streamPath, authToken)
+	errChan := make(chan error)
+	go func() {
+		errChan <- cnsmr.stream(streamPath, authToken, allEvents)
+		close(errChan)
+	}()
 
 	go func() {
-		defer close(logMessages)
-		defer close(errChan)
+		defer close(allEvents)
 
-		for event := range eventsWithMetrics {
-			switch *event.EventType {
-			case events.Envelope_LogMessage:
-				logMessages <- event.GetLogMessage()
-			case events.Envelope_Error:
-				err := event.GetError()
-				if err.GetSource() == "NOAA" {
-					errChan <- err
-					return
-				}
+		for event := range allEvents {
+			if *event.EventType == events.Envelope_LogMessage {
+				outputChan <- event.GetLogMessage()
 			}
 		}
 	}()
 
-	return logMessages, errChan
+	return <-errChan
 }
 
-// Stream listens indefinitely for log and event messages. It returns two channels; the first is populated
-// with log and event messages, while the second contains errors (e.g. from parsing messages). It returns immediately.
-// Call Close() to terminate the connection when you are finished listening.
+// Stream behaves exactly as StreamWithoutReconnect, except that it retries 5 times if the connection
+// to the remote server is lost.
+func (cnsmr *Consumer) Stream(appGuid string, authToken string, outputChan chan<- *events.Envelope, errorChan chan<- error, stopChan chan struct{}) {
+	action := func() error {
+		return cnsmr.StreamWithoutReconnect(appGuid, authToken, outputChan)
+	}
+
+	cnsmr.retryAction(action, errorChan, stopChan)
+}
+
+// StreamWithoutReconnect listens indefinitely for all log and event messages.
+//
+// If you wish to be able to terminate the listen early, run StreamWithoutReconnect in a Goroutine and
+// call Close() when you are finished listening.
 //
 // Messages are presented in the order received from the loggregator server. Chronological or other ordering
 // is not guaranteed. It is the responsibility of the consumer of these channels to provide any desired sorting
 // mechanism.
-func (cnsmr *Consumer) Stream(appGuid string, authToken string) <-chan *events.Envelope {
+func (cnsmr *Consumer) StreamWithoutReconnect(appGuid string, authToken string, outputChan chan<- *events.Envelope) error {
 	streamPath := fmt.Sprintf("/apps/%s/stream", appGuid)
-	return cnsmr.stream(streamPath, authToken)
+	return cnsmr.stream(streamPath, authToken, outputChan)
 }
 
-// Firehose streams all data. All clients with the same subscriptionId will receive a proportionate share of the
+// Firehose behaves exactly as FirehoseWithoutReconnect, except that it retries 5 times if the connection
+// to the remote server is lost.
+func (cnsmr *Consumer) Firehose(subscriptionId string, authToken string, outputChan chan<- *events.Envelope, errorChan chan<- error, stopChan chan struct{}) {
+	action := func() error {
+		return cnsmr.FirehoseWithoutReconnect(subscriptionId, authToken, outputChan)
+	}
+
+	cnsmr.retryAction(action, errorChan, stopChan)
+}
+
+// FirehoseWithoutReconnect streams all data. All clients with the same subscriptionId will receive a proportionate share of the
 // message stream. Each pool of clients will receive the entire stream.
-func (cnsmr *Consumer) Firehose(subscriptionId string, authToken string) <-chan *events.Envelope {
+//
+// If you wish to be able to terminate the listen early, run FirehoseWithoutReconnect in a Goroutine and
+// call Close() when you are finished listening.
+//
+// Messages are presented in the order received from the loggregator server. Chronological or other ordering
+// is not guaranteed. It is the responsibility of the consumer of these channels to provide any desired sorting
+// mechanism.
+func (cnsmr *Consumer) FirehoseWithoutReconnect(subscriptionId string, authToken string, outputChan chan<- *events.Envelope) error {
 	streamPath := "/firehose/" + subscriptionId
-	return cnsmr.stream(streamPath, authToken)
+	return cnsmr.stream(streamPath, authToken, outputChan)
 }
 
-func (cnsmr *Consumer) stream(streamPath string, authToken string) <-chan *events.Envelope {
-	incomingChan := make(chan *events.Envelope, 1)
+func (cnsmr *Consumer) stream(streamPath string, authToken string, outputChan chan<- *events.Envelope) error {
 	var err error
 
 	cnsmr.ws, err = cnsmr.establishWebsocketConnection(streamPath, authToken)
 
 	if err != nil {
-		incomingChan <- makeError(err, noaa_errors.ERR_DIAL)
-		close(incomingChan)
-		return incomingChan
+		return err
 	}
 
-	go func() {
-		defer close(incomingChan)
-
-		err := cnsmr.listenForMessages(incomingChan)
-		if err != nil {
-			incomingChan <- makeError(err, noaa_errors.ERR_LOST_CONNECTION)
-		}
-	}()
-
-	return incomingChan
+	return cnsmr.listenForMessages(outputChan)
 }
 
 func makeError(err error, code int32) *events.Envelope {
@@ -364,4 +359,38 @@ func (cnsmr *Consumer) proxyDial(network, addr string) (net.Conn, error) {
 	}
 
 	return proxyConn, nil
+}
+
+func (cnsmr *Consumer) retryAction(action func() error, errorChan chan<- error, stopChan chan struct{}) {
+	reconnectAttempts := 0
+
+	oldConnectCallback := cnsmr.callback
+	defer func() { cnsmr.callback = oldConnectCallback }()
+
+	defer close(errorChan)
+
+	cnsmr.callback = func() {
+		reconnectAttempts = 0
+		if oldConnectCallback != nil {
+			oldConnectCallback()
+		}
+	}
+
+	for ; reconnectAttempts < 5; reconnectAttempts++ {
+		errChan := make(chan error)
+		select {
+		case <-stopChan:
+			cnsmr.Close()
+			return
+		default:
+		}
+
+		go func() {
+			errChan <- action()
+		}()
+
+		err := <-errChan
+		errorChan <- err
+		time.Sleep(reconnectTimeout)
+	}
 }

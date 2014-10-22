@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/cloudfoundry/noaa"
+	"github.com/cloudfoundry/noaa/events"
 )
 
 var DopplerAddress = "wss://doppler.10.244.0.34.xip.io:443"
@@ -28,7 +29,16 @@ func main() {
 	}
 
 	fmt.Println("===== Streaming metrics")
-	msgChan := connection.Stream(appGuid, authToken)
+	msgChan := make(chan *events.Envelope)
+	go func() {
+		defer close(msgChan)
+		errorChan := make(chan error)
+		go connection.Stream(appGuid, authToken, msgChan, errorChan, nil)
+
+		for err := range errorChan {
+			fmt.Fprintf(os.Stderr, "%v\n", err.Error())
+		}
+	}()
 
 	for msg := range msgChan {
 		fmt.Printf("%v \n", msg)
