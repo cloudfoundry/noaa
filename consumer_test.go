@@ -236,7 +236,7 @@ var _ = Describe("Noaa", func() {
 
 						var err error
 						Eventually(errorChan).Should(Receive(&err))
-						Expect(err.Error()).To(Equal("EOF"))
+						Expect(err.Error()).To(ContainSubstring("websocket: close 1005"))
 
 						close(done)
 					})
@@ -641,7 +641,7 @@ var _ = Describe("Noaa", func() {
 
 				var err error
 				Eventually(errChan).Should(Receive(&err))
-				Expect(err.Error()).To(Equal("EOF"))
+				Expect(err.Error()).To(ContainSubstring("websocket: close 1005"))
 
 				close(done)
 			})
