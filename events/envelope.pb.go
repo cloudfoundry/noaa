@@ -12,6 +12,7 @@ It is generated from these files:
 	http.proto
 	log.proto
 	metric.proto
+	uuid.proto
 
 It has these top-level messages:
 	Envelope
@@ -25,6 +26,7 @@ import math "math"
 var _ = proto.Marshal
 var _ = math.Inf
 
+// / Type of the wrapped event.
 type Envelope_EventType int32
 
 const (
@@ -76,6 +78,7 @@ func (x *Envelope_EventType) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// / Envelope wraps an Event and adds metadata.
 type Envelope struct {
 	Origin           *string             `protobuf:"bytes,1,req,name=origin" json:"origin,omitempty"`
 	EventType        *Envelope_EventType `protobuf:"varint,2,req,name=eventType,enum=events.Envelope_EventType" json:"eventType,omitempty"`
