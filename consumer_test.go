@@ -672,7 +672,6 @@ var _ = Describe("Noaa", func() {
 		})
 
 		Context("when the connection can be established", func() {
-
 			BeforeEach(func() {
 				testServer = httptest.NewServer(handlers.NewHttpHandler(messagesToSend, loggertesthelper.Logger()))
 				trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
@@ -693,7 +692,6 @@ var _ = Describe("Noaa", func() {
 
 		Context("when the content type is missing", func() {
 			BeforeEach(func() {
-
 				serverMux := http.NewServeMux()
 				serverMux.HandleFunc("/apps/appGuid/recentlogs", func(resp http.ResponseWriter, req *http.Request) {
 					resp.Header().Set("Content-Type", "")
@@ -703,13 +701,12 @@ var _ = Describe("Noaa", func() {
 				trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
 			})
 
-			It("it returns a bad reponse error message", func() {
+			It("returns a bad reponse error message", func() {
 				perform()
 
 				Expect(recentError).To(HaveOccurred())
 				Expect(recentError).To(Equal(noaa.ErrBadResponse))
 			})
-
 		})
 
 		Context("when the content length is unknown", func() {
@@ -725,7 +722,7 @@ var _ = Describe("Noaa", func() {
 				trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
 			})
 
-			It("it does not throw an error", func() {
+			It("does not throw an error", func() {
 				fakeHandler.InputChan <- marshalMessage(createMessage("bad-content-length", 0))
 				fakeHandler.Close()
 				perform()
@@ -747,7 +744,7 @@ var _ = Describe("Noaa", func() {
 				trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
 			})
 
-			It("it returns a bad reponse error message", func() {
+			It("returns a bad reponse error message", func() {
 				perform()
 
 				Expect(recentError).To(HaveOccurred())
@@ -768,7 +765,7 @@ var _ = Describe("Noaa", func() {
 				trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
 			})
 
-			It("it returns a bad reponse error message", func() {
+			It("returns a bad reponse error message", func() {
 				perform()
 
 				Expect(recentError).To(HaveOccurred())
@@ -788,7 +785,7 @@ var _ = Describe("Noaa", func() {
 				trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
 			})
 
-			It("it returns a not found reponse error message", func() {
+			It("returns a not found reponse error message", func() {
 				perform()
 
 				Expect(recentError).To(HaveOccurred())
@@ -808,7 +805,174 @@ var _ = Describe("Noaa", func() {
 				trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
 			})
 
-			It("it returns a helpful error message", func() {
+			It("returns a helpful error message", func() {
+				perform()
+
+				Expect(recentError).To(HaveOccurred())
+				Expect(recentError.Error()).To(ContainSubstring("You are not authorized. Helpful message"))
+				Expect(recentError).To(BeAssignableToTypeOf(&noaa_errors.UnauthorizedError{}))
+			})
+		})
+	})
+
+	Describe("ContainerMetrics", func() {
+		var (
+			appGuid             = "appGuid"
+			authToken           = "authToken"
+			receivedContainerMetrics []*events.ContainerMetric
+			recentError         error
+		)
+
+		perform := func() {
+			close(messagesToSend)
+			connection = noaa.NewConsumer(trafficControllerUrl, nil, nil)
+			receivedContainerMetrics, recentError = connection.ContainerMetrics(appGuid, authToken)
+		}
+
+		Context("when the connection cannot be established", func() {
+			It("invalid urls return error", func() {
+				trafficControllerUrl = "invalid-url"
+				perform()
+
+				Expect(recentError).ToNot(BeNil())
+			})
+		})
+
+		Context("when the connection can be established", func() {
+			BeforeEach(func() {
+				testServer = httptest.NewServer(handlers.NewHttpHandler(messagesToSend, loggertesthelper.Logger()))
+				trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
+			})
+
+			It("returns messages from the server", func() {
+				messagesToSend <- marshalMessage(createContainerMetric(2, 2000))
+				messagesToSend <- marshalMessage(createContainerMetric(1, 1000))
+
+				perform()
+
+				Expect(recentError).NotTo(HaveOccurred())
+				Expect(receivedContainerMetrics).To(HaveLen(2))
+				Expect(receivedContainerMetrics[0].GetInstanceIndex()).To(Equal(int32(1)))
+				Expect(receivedContainerMetrics[1].GetInstanceIndex()).To(Equal(int32(2)))
+			})
+		})
+
+		Context("when the content type is missing", func() {
+			BeforeEach(func() {
+				serverMux := http.NewServeMux()
+				serverMux.HandleFunc("/apps/appGuid/containermetrics", func(resp http.ResponseWriter, req *http.Request) {
+					resp.Header().Set("Content-Type", "")
+					resp.Write([]byte("OK"))
+				})
+				testServer = httptest.NewServer(serverMux)
+				trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
+			})
+
+			It("returns a bad reponse error message", func() {
+				perform()
+
+				Expect(recentError).To(HaveOccurred())
+				Expect(recentError).To(Equal(noaa.ErrBadResponse))
+			})
+		})
+
+		Context("when the content length is unknown", func() {
+			BeforeEach(func() {
+				fakeHandler = &FakeHandler{
+					contentLen: "-1",
+					InputChan:  make(chan []byte, 10),
+					GenerateHandler: func(input chan []byte) http.Handler {
+						return handlers.NewHttpHandler(input, loggertesthelper.Logger())
+					},
+				}
+				testServer = httptest.NewServer(fakeHandler)
+				trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
+			})
+
+			It("does not throw an error", func() {
+				fakeHandler.InputChan <- marshalMessage(createMessage("bad-content-length", 0))
+				fakeHandler.Close()
+				perform()
+
+				Expect(recentError).NotTo(HaveOccurred())
+				Expect(receivedContainerMetrics).To(HaveLen(1))
+			})
+
+		})
+
+		Context("when the content type doesn't have a boundary", func() {
+			BeforeEach(func() {
+
+				serverMux := http.NewServeMux()
+				serverMux.HandleFunc("/apps/appGuid/containermetrics", func(resp http.ResponseWriter, req *http.Request) {
+					resp.Write([]byte("OK"))
+				})
+				testServer = httptest.NewServer(serverMux)
+				trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
+			})
+
+			It("returns a bad reponse error message", func() {
+				perform()
+
+				Expect(recentError).To(HaveOccurred())
+				Expect(recentError).To(Equal(noaa.ErrBadResponse))
+			})
+
+		})
+
+		Context("when the content type's boundary is blank", func() {
+			BeforeEach(func() {
+
+				serverMux := http.NewServeMux()
+				serverMux.HandleFunc("/apps/appGuid/containermetrics", func(resp http.ResponseWriter, req *http.Request) {
+					resp.Header().Set("Content-Type", "boundary=")
+					resp.Write([]byte("OK"))
+				})
+				testServer = httptest.NewServer(serverMux)
+				trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
+			})
+
+			It("returns a bad reponse error message", func() {
+				perform()
+
+				Expect(recentError).To(HaveOccurred())
+				Expect(recentError).To(Equal(noaa.ErrBadResponse))
+			})
+
+		})
+
+		Context("when the path is not found", func() {
+			BeforeEach(func() {
+
+				serverMux := http.NewServeMux()
+				serverMux.HandleFunc("/apps/appGuid/containermetrics", func(resp http.ResponseWriter, req *http.Request) {
+					resp.WriteHeader(http.StatusNotFound)
+				})
+				testServer = httptest.NewServer(serverMux)
+				trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
+			})
+
+			It("returns a not found reponse error message", func() {
+				perform()
+
+				Expect(recentError).To(HaveOccurred())
+				Expect(recentError).To(Equal(noaa.ErrNotFound))
+			})
+
+		})
+
+		Context("when the authorization fails", func() {
+			var failer authFailer
+
+			BeforeEach(func() {
+				failer = authFailer{Message: "Helpful message"}
+				serverMux := http.NewServeMux()
+				serverMux.Handle("/apps/appGuid/containermetrics", failer)
+				testServer = httptest.NewServer(serverMux)
+				trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
+			})
+
+			It("returns a helpful error message", func() {
 				perform()
 
 				Expect(recentError).To(HaveOccurred())
@@ -1024,6 +1188,24 @@ func createMessage(message string, timestamp int64) *events.Envelope {
 	return &events.Envelope{
 		LogMessage: logMessage,
 		EventType:  events.Envelope_LogMessage.Enum(),
+		Origin:     proto.String("fake-origin-1"),
+		Timestamp:  proto.Int64(timestamp),
+	}
+}
+
+func createContainerMetric(instanceIndex int32, timestamp int64) *events.Envelope {
+	if timestamp == 0 {
+		timestamp = time.Now().UnixNano()
+	}
+
+	cm := &events.ContainerMetric{
+		ApplicationId: proto.String("appId"),
+		InstanceIndex: proto.Int32(instanceIndex),
+	}
+
+	return &events.Envelope{
+		ContainerMetric: cm,
+		EventType:  events.Envelope_ContainerMetric.Enum(),
 		Origin:     proto.String("fake-origin-1"),
 		Timestamp:  proto.Int64(timestamp),
 	}

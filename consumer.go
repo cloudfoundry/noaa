@@ -51,7 +51,7 @@ func NewConsumer(trafficControllerUrl string, tlsConfig *tls.Config, proxy func(
 
 // TailingLogs behaves exactly as TailingLogsWithoutReconnect, except that it retries 5 times if the connection
 // to the remote server is lost and returns all errors from each attempt on errorChan.
-func (cnsmr *Consumer) TailingLogs(appGuid string, authToken string, outputChan chan<- *events.LogMessage, errorChan chan<- error, stopChan chan struct{}) {
+func (cnsmr *Consumer) TailingLogs(appGuid string, authToken string, outputChan chan <- *events.LogMessage, errorChan chan <- error, stopChan chan struct{}) {
 	action := func() error {
 		return cnsmr.TailingLogsWithoutReconnect(appGuid, authToken, outputChan)
 	}
@@ -67,13 +67,14 @@ func (cnsmr *Consumer) TailingLogs(appGuid string, authToken string, outputChan 
 // Messages are presented in the order received from the loggregator server. Chronological or
 // other ordering is not guaranteed. It is the responsibility of the consumer of these channels
 // to provide any desired sorting mechanism.
-func (cnsmr *Consumer) TailingLogsWithoutReconnect(appGuid string, authToken string, outputChan chan<- *events.LogMessage) error {
+func (cnsmr *Consumer) TailingLogsWithoutReconnect(appGuid string, authToken string, outputChan chan <- *events.LogMessage) error {
 	allEvents := make(chan *events.Envelope)
 
 	streamPath := fmt.Sprintf("/apps/%s/stream", appGuid)
 	errChan := make(chan error)
 	go func() {
-		errChan <- cnsmr.stream(streamPath, authToken, allEvents)
+		err := cnsmr.stream(streamPath, authToken, allEvents)
+		errChan <- err
 		close(errChan)
 	}()
 
@@ -92,7 +93,7 @@ func (cnsmr *Consumer) TailingLogsWithoutReconnect(appGuid string, authToken str
 
 // Stream behaves exactly as StreamWithoutReconnect, except that it retries 5 times if the connection
 // to the remote server is lost.
-func (cnsmr *Consumer) Stream(appGuid string, authToken string, outputChan chan<- *events.Envelope, errorChan chan<- error, stopChan chan struct{}) {
+func (cnsmr *Consumer) Stream(appGuid string, authToken string, outputChan chan <- *events.Envelope, errorChan chan <- error, stopChan chan struct{}) {
 	action := func() error {
 		return cnsmr.StreamWithoutReconnect(appGuid, authToken, outputChan)
 	}
@@ -108,14 +109,14 @@ func (cnsmr *Consumer) Stream(appGuid string, authToken string, outputChan chan<
 // Messages are presented in the order received from the loggregator server. Chronological or other ordering
 // is not guaranteed. It is the responsibility of the consumer of these channels to provide any desired sorting
 // mechanism.
-func (cnsmr *Consumer) StreamWithoutReconnect(appGuid string, authToken string, outputChan chan<- *events.Envelope) error {
+func (cnsmr *Consumer) StreamWithoutReconnect(appGuid string, authToken string, outputChan chan <- *events.Envelope) error {
 	streamPath := fmt.Sprintf("/apps/%s/stream", appGuid)
 	return cnsmr.stream(streamPath, authToken, outputChan)
 }
 
 // Firehose behaves exactly as FirehoseWithoutReconnect, except that it retries 5 times if the connection
 // to the remote server is lost.
-func (cnsmr *Consumer) Firehose(subscriptionId string, authToken string, outputChan chan<- *events.Envelope, errorChan chan<- error, stopChan chan struct{}) {
+func (cnsmr *Consumer) Firehose(subscriptionId string, authToken string, outputChan chan <- *events.Envelope, errorChan chan <- error, stopChan chan struct{}) {
 	action := func() error {
 		return cnsmr.FirehoseWithoutReconnect(subscriptionId, authToken, outputChan)
 	}
@@ -132,12 +133,12 @@ func (cnsmr *Consumer) Firehose(subscriptionId string, authToken string, outputC
 // Messages are presented in the order received from the loggregator server. Chronological or other ordering
 // is not guaranteed. It is the responsibility of the consumer of these channels to provide any desired sorting
 // mechanism.
-func (cnsmr *Consumer) FirehoseWithoutReconnect(subscriptionId string, authToken string, outputChan chan<- *events.Envelope) error {
+func (cnsmr *Consumer) FirehoseWithoutReconnect(subscriptionId string, authToken string, outputChan chan <- *events.Envelope) error {
 	streamPath := "/firehose/" + subscriptionId
 	return cnsmr.stream(streamPath, authToken, outputChan)
 }
 
-func (cnsmr *Consumer) stream(streamPath string, authToken string, outputChan chan<- *events.Envelope) error {
+func (cnsmr *Consumer) stream(streamPath string, authToken string, outputChan chan <- *events.Envelope) error {
 	var err error
 
 	cnsmr.Lock()
@@ -167,55 +168,23 @@ func makeError(err error, code int32) *events.Envelope {
 //
 // The SortRecent method is provided to sort the data returned by this method.
 func (cnsmr *Consumer) RecentLogs(appGuid string, authToken string) ([]*events.LogMessage, error) {
-	trafficControllerUrl, err := url.ParseRequestURI(cnsmr.trafficControllerUrl)
+	resp, err := cnsmr.makeHttpRequestToTrafficController(appGuid, authToken, "recentlogs")
+
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("Error dialing traffic controller server: %s.\nPlease ask your Cloud Foundry Operator to check the platform configuration (traffic controller endpoint is %s).", err.Error(), cnsmr.trafficControllerUrl))
+	}
+
+	defer resp.Body.Close()
+
+	err = checkForErrors(resp)
 	if err != nil {
 		return nil, err
 	}
 
-	scheme := "https"
-
-	if trafficControllerUrl.Scheme == "ws" {
-		scheme = "http"
-	}
-
-	recentPath := fmt.Sprintf("%s://%s/apps/%s/recentlogs", scheme, trafficControllerUrl.Host, appGuid)
-	transport := &http.Transport{Proxy: cnsmr.proxy, TLSClientConfig: cnsmr.tlsConfig}
-	client := &http.Client{Transport: transport}
-
-	req, _ := http.NewRequest("GET", recentPath, nil)
-	req.Header.Set("Authorization", authToken)
-
-	resp, err := client.Do(req)
+	reader, err := checkContentsAndFindBoundaries(resp)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("Error dialing traffic controller server: %s.\nPlease ask your Cloud Foundry Operator to check the platform configuration (traffic controller endpoint is %s).", err.Error(), cnsmr.trafficControllerUrl))
+		return nil, err
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode == http.StatusUnauthorized {
-		data, _ := ioutil.ReadAll(resp.Body)
-		return nil, noaa_errors.NewUnauthorizedError(string(data))
-	}
-
-	if resp.StatusCode == http.StatusBadRequest {
-		return nil, ErrBadRequest
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, ErrNotFound
-	}
-
-	contentType := resp.Header.Get("Content-Type")
-
-	if len(strings.TrimSpace(contentType)) == 0 {
-		return nil, ErrBadResponse
-	}
-
-	matches := boundaryRegexp.FindStringSubmatch(contentType)
-
-	if len(matches) != 2 || len(strings.TrimSpace(matches[1])) == 0 {
-		return nil, ErrBadResponse
-	}
-
-	reader := multipart.NewReader(resp.Body, matches[1])
 
 	var buffer bytes.Buffer
 	messages := make([]*events.LogMessage, 0, 200)
@@ -233,6 +202,101 @@ func (cnsmr *Consumer) RecentLogs(appGuid string, authToken string) ([]*events.L
 	}
 
 	return messages, err
+}
+
+// ContainerMetrics connects to traffic controller via its 'containermetrics' http(s) endpoint and returns the most recent messages for an app.
+// The returned metrics will be sorted by InstanceIndex.
+func (cnsmr *Consumer) ContainerMetrics(appGuid string, authToken string) ([]*events.ContainerMetric, error) {
+	resp, err := cnsmr.makeHttpRequestToTrafficController(appGuid, authToken, "containermetrics")
+
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("Error dialing traffic controller server: %s.\nPlease ask your Cloud Foundry Operator to check the platform configuration (traffic controller endpoint is %s).", err.Error(), cnsmr.trafficControllerUrl))
+	}
+
+	defer resp.Body.Close()
+
+	err = checkForErrors(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	reader, err := checkContentsAndFindBoundaries(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	var buffer bytes.Buffer
+	messages := make([]*events.ContainerMetric, 0, 200)
+
+	for part, loopErr := reader.NextPart(); loopErr == nil; part, loopErr = reader.NextPart() {
+		buffer.Reset()
+
+		msg := new(events.Envelope)
+		_, err := buffer.ReadFrom(part)
+		if err != nil {
+			break
+		}
+		proto.Unmarshal(buffer.Bytes(), msg)
+		messages = append(messages, msg.GetContainerMetric())
+	}
+
+	SortContainerMetrics(messages)
+
+	return messages, err
+}
+
+func (cnsmr *Consumer) makeHttpRequestToTrafficController(appGuid string, authToken string, endpoint string) (*http.Response, error) {
+	trafficControllerUrl, err := url.ParseRequestURI(cnsmr.trafficControllerUrl)
+	if err != nil {
+		return nil, err
+	}
+
+	scheme := "https"
+
+	if trafficControllerUrl.Scheme == "ws" {
+		scheme = "http"
+	}
+
+	recentPath := fmt.Sprintf("%s://%s/apps/%s/%s", scheme, trafficControllerUrl.Host, appGuid, endpoint)
+	transport := &http.Transport{Proxy: cnsmr.proxy, TLSClientConfig: cnsmr.tlsConfig}
+	client := &http.Client{Transport: transport}
+
+	req, _ := http.NewRequest("GET", recentPath, nil)
+	req.Header.Set("Authorization", authToken)
+
+	return client.Do(req)
+}
+
+func checkForErrors(resp *http.Response) error {
+	if resp.StatusCode == http.StatusUnauthorized {
+		data, _ := ioutil.ReadAll(resp.Body)
+		return noaa_errors.NewUnauthorizedError(string(data))
+	}
+
+	if resp.StatusCode == http.StatusBadRequest {
+		return ErrBadRequest
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func checkContentsAndFindBoundaries(resp *http.Response) (*multipart.Reader, error) {
+	contentType := resp.Header.Get("Content-Type")
+
+	if len(strings.TrimSpace(contentType)) == 0 {
+		return nil, ErrBadResponse
+	}
+
+	matches := boundaryRegexp.FindStringSubmatch(contentType)
+
+	if len(matches) != 2 || len(strings.TrimSpace(matches[1])) == 0 {
+		return nil, ErrBadResponse
+	}
+	reader := multipart.NewReader(resp.Body, matches[1])
+	return reader, nil
 }
 
 // Close terminates the websocket connection to traffic controller.
@@ -256,7 +320,7 @@ func (cnsmr *Consumer) SetDebugPrinter(debugPrinter DebugPrinter) {
 	cnsmr.debugPrinter = debugPrinter
 }
 
-func (cnsmr *Consumer) listenForMessages(msgChan chan<- *events.Envelope) error {
+func (cnsmr *Consumer) listenForMessages(msgChan chan <- *events.Envelope) error {
 	defer cnsmr.ws.Close()
 
 	for {
@@ -278,7 +342,7 @@ func (cnsmr *Consumer) listenForMessages(msgChan chan<- *events.Envelope) error 
 func headersString(header http.Header) string {
 	var result string
 	for name, values := range header {
-		result += name + ": " + strings.Join(values, ", ") + "\n"
+		result += name+": "+strings.Join(values, ", ")+"\n"
 	}
 	return result
 }
@@ -291,17 +355,17 @@ func (cnsmr *Consumer) establishWebsocketConnection(path string, authToken strin
 	url := cnsmr.trafficControllerUrl + path
 
 	cnsmr.debugPrinter.Print("WEBSOCKET REQUEST:",
-		"GET "+path+" HTTP/1.1\n"+
-			"Host: "+cnsmr.trafficControllerUrl+"\n"+
-			"Upgrade: websocket\nConnection: Upgrade\nSec-WebSocket-Version: 13\nSec-WebSocket-Key: [HIDDEN]\n"+
-			headersString(header))
+									"GET "+path+" HTTP/1.1\n" +
+									"Host: "+cnsmr.trafficControllerUrl+"\n" +
+						"Upgrade: websocket\nConnection: Upgrade\nSec-WebSocket-Version: 13\nSec-WebSocket-Key: [HIDDEN]\n" +
+					headersString(header))
 
 	ws, resp, err := dialer.Dial(url, header)
 
 	if resp != nil {
 		cnsmr.debugPrinter.Print("WEBSOCKET RESPONSE:",
-			resp.Proto+" "+resp.Status+"\n"+
-				headersString(resp.Header))
+							resp.Proto+" "+resp.Status+"\n" +
+						headersString(resp.Header))
 	}
 
 	if resp != nil && resp.StatusCode == http.StatusUnauthorized {
@@ -315,6 +379,7 @@ func (cnsmr *Consumer) establishWebsocketConnection(path string, authToken strin
 	}
 
 	if err != nil {
+
 		return nil, errors.New(fmt.Sprintf("Error dialing traffic controller server: %s.\nPlease ask your Cloud Foundry Operator to check the platform configuration (traffic controller is %s).", err.Error(), cnsmr.trafficControllerUrl))
 	}
 
@@ -367,7 +432,7 @@ func (cnsmr *Consumer) proxyDial(network, addr string) (net.Conn, error) {
 	return proxyConn, nil
 }
 
-func (cnsmr *Consumer) retryAction(action func() error, errorChan chan<- error, stopChan chan struct{}) {
+func (cnsmr *Consumer) retryAction(action func() error, errorChan chan <- error, stopChan chan struct{}) {
 	reconnectAttempts := 0
 
 	oldConnectCallback := cnsmr.callback
