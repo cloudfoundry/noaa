@@ -1,12 +1,12 @@
 package noaa_test
 
 import (
+	"code.google.com/p/gogoprotobuf/proto"
 	"github.com/cloudfoundry/noaa"
 	"github.com/cloudfoundry/noaa/events"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"code.google.com/p/gogoprotobuf/proto"
 )
 
 var _ = Describe("SortContainerMetrics", func() {

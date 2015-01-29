@@ -817,10 +817,10 @@ var _ = Describe("Noaa", func() {
 
 	Describe("ContainerMetrics", func() {
 		var (
-			appGuid             = "appGuid"
-			authToken           = "authToken"
+			appGuid                  = "appGuid"
+			authToken                = "authToken"
 			receivedContainerMetrics []*events.ContainerMetric
-			recentError         error
+			recentError              error
 		)
 
 		perform := func() {
@@ -1205,9 +1205,9 @@ func createContainerMetric(instanceIndex int32, timestamp int64) *events.Envelop
 
 	return &events.Envelope{
 		ContainerMetric: cm,
-		EventType:  events.Envelope_ContainerMetric.Enum(),
-		Origin:     proto.String("fake-origin-1"),
-		Timestamp:  proto.Int64(timestamp),
+		EventType:       events.Envelope_ContainerMetric.Enum(),
+		Origin:          proto.String("fake-origin-1"),
+		Timestamp:       proto.Int64(timestamp),
 	}
 }
 

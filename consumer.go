@@ -51,7 +51,7 @@ func NewConsumer(trafficControllerUrl string, tlsConfig *tls.Config, proxy func(
 
 // TailingLogs behaves exactly as TailingLogsWithoutReconnect, except that it retries 5 times if the connection
 // to the remote server is lost and returns all errors from each attempt on errorChan.
-func (cnsmr *Consumer) TailingLogs(appGuid string, authToken string, outputChan chan <- *events.LogMessage, errorChan chan <- error, stopChan chan struct{}) {
+func (cnsmr *Consumer) TailingLogs(appGuid string, authToken string, outputChan chan<- *events.LogMessage, errorChan chan<- error, stopChan chan struct{}) {
 	action := func() error {
 		return cnsmr.TailingLogsWithoutReconnect(appGuid, authToken, outputChan)
 	}
@@ -67,7 +67,7 @@ func (cnsmr *Consumer) TailingLogs(appGuid string, authToken string, outputChan 
 // Messages are presented in the order received from the loggregator server. Chronological or
 // other ordering is not guaranteed. It is the responsibility of the consumer of these channels
 // to provide any desired sorting mechanism.
-func (cnsmr *Consumer) TailingLogsWithoutReconnect(appGuid string, authToken string, outputChan chan <- *events.LogMessage) error {
+func (cnsmr *Consumer) TailingLogsWithoutReconnect(appGuid string, authToken string, outputChan chan<- *events.LogMessage) error {
 	allEvents := make(chan *events.Envelope)
 
 	streamPath := fmt.Sprintf("/apps/%s/stream", appGuid)
@@ -93,7 +93,7 @@ func (cnsmr *Consumer) TailingLogsWithoutReconnect(appGuid string, authToken str
 
 // Stream behaves exactly as StreamWithoutReconnect, except that it retries 5 times if the connection
 // to the remote server is lost.
-func (cnsmr *Consumer) Stream(appGuid string, authToken string, outputChan chan <- *events.Envelope, errorChan chan <- error, stopChan chan struct{}) {
+func (cnsmr *Consumer) Stream(appGuid string, authToken string, outputChan chan<- *events.Envelope, errorChan chan<- error, stopChan chan struct{}) {
 	action := func() error {
 		return cnsmr.StreamWithoutReconnect(appGuid, authToken, outputChan)
 	}
@@ -109,14 +109,14 @@ func (cnsmr *Consumer) Stream(appGuid string, authToken string, outputChan chan 
 // Messages are presented in the order received from the loggregator server. Chronological or other ordering
 // is not guaranteed. It is the responsibility of the consumer of these channels to provide any desired sorting
 // mechanism.
-func (cnsmr *Consumer) StreamWithoutReconnect(appGuid string, authToken string, outputChan chan <- *events.Envelope) error {
+func (cnsmr *Consumer) StreamWithoutReconnect(appGuid string, authToken string, outputChan chan<- *events.Envelope) error {
 	streamPath := fmt.Sprintf("/apps/%s/stream", appGuid)
 	return cnsmr.stream(streamPath, authToken, outputChan)
 }
 
 // Firehose behaves exactly as FirehoseWithoutReconnect, except that it retries 5 times if the connection
 // to the remote server is lost.
-func (cnsmr *Consumer) Firehose(subscriptionId string, authToken string, outputChan chan <- *events.Envelope, errorChan chan <- error, stopChan chan struct{}) {
+func (cnsmr *Consumer) Firehose(subscriptionId string, authToken string, outputChan chan<- *events.Envelope, errorChan chan<- error, stopChan chan struct{}) {
 	action := func() error {
 		return cnsmr.FirehoseWithoutReconnect(subscriptionId, authToken, outputChan)
 	}
@@ -133,12 +133,12 @@ func (cnsmr *Consumer) Firehose(subscriptionId string, authToken string, outputC
 // Messages are presented in the order received from the loggregator server. Chronological or other ordering
 // is not guaranteed. It is the responsibility of the consumer of these channels to provide any desired sorting
 // mechanism.
-func (cnsmr *Consumer) FirehoseWithoutReconnect(subscriptionId string, authToken string, outputChan chan <- *events.Envelope) error {
+func (cnsmr *Consumer) FirehoseWithoutReconnect(subscriptionId string, authToken string, outputChan chan<- *events.Envelope) error {
 	streamPath := "/firehose/" + subscriptionId
 	return cnsmr.stream(streamPath, authToken, outputChan)
 }
 
-func (cnsmr *Consumer) stream(streamPath string, authToken string, outputChan chan <- *events.Envelope) error {
+func (cnsmr *Consumer) stream(streamPath string, authToken string, outputChan chan<- *events.Envelope) error {
 	var err error
 
 	cnsmr.Lock()
@@ -320,7 +320,7 @@ func (cnsmr *Consumer) SetDebugPrinter(debugPrinter DebugPrinter) {
 	cnsmr.debugPrinter = debugPrinter
 }
 
-func (cnsmr *Consumer) listenForMessages(msgChan chan <- *events.Envelope) error {
+func (cnsmr *Consumer) listenForMessages(msgChan chan<- *events.Envelope) error {
 	defer cnsmr.ws.Close()
 
 	for {
@@ -342,7 +342,7 @@ func (cnsmr *Consumer) listenForMessages(msgChan chan <- *events.Envelope) error
 func headersString(header http.Header) string {
 	var result string
 	for name, values := range header {
-		result += name+": "+strings.Join(values, ", ")+"\n"
+		result += name + ": " + strings.Join(values, ", ") + "\n"
 	}
 	return result
 }
@@ -355,17 +355,17 @@ func (cnsmr *Consumer) establishWebsocketConnection(path string, authToken strin
 	url := cnsmr.trafficControllerUrl + path
 
 	cnsmr.debugPrinter.Print("WEBSOCKET REQUEST:",
-									"GET "+path+" HTTP/1.1\n" +
-									"Host: "+cnsmr.trafficControllerUrl+"\n" +
-						"Upgrade: websocket\nConnection: Upgrade\nSec-WebSocket-Version: 13\nSec-WebSocket-Key: [HIDDEN]\n" +
-					headersString(header))
+		"GET "+path+" HTTP/1.1\n"+
+			"Host: "+cnsmr.trafficControllerUrl+"\n"+
+			"Upgrade: websocket\nConnection: Upgrade\nSec-WebSocket-Version: 13\nSec-WebSocket-Key: [HIDDEN]\n"+
+			headersString(header))
 
 	ws, resp, err := dialer.Dial(url, header)
 
 	if resp != nil {
 		cnsmr.debugPrinter.Print("WEBSOCKET RESPONSE:",
-							resp.Proto+" "+resp.Status+"\n" +
-						headersString(resp.Header))
+			resp.Proto+" "+resp.Status+"\n"+
+				headersString(resp.Header))
 	}
 
 	if resp != nil && resp.StatusCode == http.StatusUnauthorized {
@@ -432,7 +432,7 @@ func (cnsmr *Consumer) proxyDial(network, addr string) (net.Conn, error) {
 	return proxyConn, nil
 }
 
-func (cnsmr *Consumer) retryAction(action func() error, errorChan chan <- error, stopChan chan struct{}) {
+func (cnsmr *Consumer) retryAction(action func() error, errorChan chan<- error, stopChan chan struct{}) {
 	reconnectAttempts := 0
 
 	oldConnectCallback := cnsmr.callback
