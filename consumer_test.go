@@ -844,16 +844,30 @@ var _ = Describe("Noaa", func() {
 				trafficControllerUrl = "ws://" + testServer.Listener.Addr().String()
 			})
 
-			It("returns messages from the server", func() {
-				messagesToSend <- marshalMessage(createContainerMetric(2, 2000))
-				messagesToSend <- marshalMessage(createContainerMetric(1, 1000))
+			Context("with a successful connection", func() {
+				It("returns messages from the server", func() {
+					messagesToSend <- marshalMessage(createContainerMetric(2, 2000))
+					messagesToSend <- marshalMessage(createContainerMetric(1, 1000))
 
-				perform()
+					perform()
 
-				Expect(recentError).NotTo(HaveOccurred())
-				Expect(receivedContainerMetrics).To(HaveLen(2))
-				Expect(receivedContainerMetrics[0].GetInstanceIndex()).To(Equal(int32(1)))
-				Expect(receivedContainerMetrics[1].GetInstanceIndex()).To(Equal(int32(2)))
+					Expect(recentError).NotTo(HaveOccurred())
+					Expect(receivedContainerMetrics).To(HaveLen(2))
+					Expect(receivedContainerMetrics[0].GetInstanceIndex()).To(Equal(int32(1)))
+					Expect(receivedContainerMetrics[1].GetInstanceIndex()).To(Equal(int32(2)))
+				})
+			})
+
+			Context("when trafficcontroller returns an error as a log message", func() {
+				It("returns the error", func() {
+					messagesToSend <- marshalMessage(createContainerMetric(2, 2000))
+					messagesToSend <- marshalMessage(createMessage("an error occurred", 2000))
+
+					perform()
+
+					Expect(recentError).To(HaveOccurred())
+					Expect(recentError).To(MatchError("Upstream error: an error occurred"))
+				})
 			})
 		})
 
@@ -890,7 +904,7 @@ var _ = Describe("Noaa", func() {
 			})
 
 			It("does not throw an error", func() {
-				fakeHandler.InputChan <- marshalMessage(createMessage("bad-content-length", 0))
+				fakeHandler.InputChan <- marshalMessage(createContainerMetric(2, 2000))
 				fakeHandler.Close()
 				perform()
 

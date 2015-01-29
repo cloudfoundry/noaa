@@ -237,6 +237,11 @@ func (cnsmr *Consumer) ContainerMetrics(appGuid string, authToken string) ([]*ev
 			break
 		}
 		proto.Unmarshal(buffer.Bytes(), msg)
+
+		if msg.GetEventType() == events.Envelope_LogMessage {
+			return []*events.ContainerMetric{}, errors.New(fmt.Sprintf("Upstream error: %s", msg.GetLogMessage().GetMessage()))
+		}
+
 		messages = append(messages, msg.GetContainerMetric())
 	}
 
