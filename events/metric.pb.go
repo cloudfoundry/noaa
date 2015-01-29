@@ -69,5 +69,54 @@ func (m *CounterEvent) GetDelta() uint64 {
 	return 0
 }
 
+// / A ContainerMetric records resource usage of an app in a container.
+type ContainerMetric struct {
+	ApplicationId    *string  `protobuf:"bytes,1,req,name=applicationId" json:"applicationId,omitempty"`
+	InstanceIndex    *int32   `protobuf:"varint,2,req,name=instanceIndex" json:"instanceIndex,omitempty"`
+	CpuPercentage    *float64 `protobuf:"fixed64,3,req,name=cpuPercentage" json:"cpuPercentage,omitempty"`
+	MemoryBytes      *uint64  `protobuf:"varint,4,req,name=memoryBytes" json:"memoryBytes,omitempty"`
+	DiskBytes        *uint64  `protobuf:"varint,5,req,name=diskBytes" json:"diskBytes,omitempty"`
+	XXX_unrecognized []byte   `json:"-"`
+}
+
+func (m *ContainerMetric) Reset()         { *m = ContainerMetric{} }
+func (m *ContainerMetric) String() string { return proto.CompactTextString(m) }
+func (*ContainerMetric) ProtoMessage()    {}
+
+func (m *ContainerMetric) GetApplicationId() string {
+	if m != nil && m.ApplicationId != nil {
+		return *m.ApplicationId
+	}
+	return ""
+}
+
+func (m *ContainerMetric) GetInstanceIndex() int32 {
+	if m != nil && m.InstanceIndex != nil {
+		return *m.InstanceIndex
+	}
+	return 0
+}
+
+func (m *ContainerMetric) GetCpuPercentage() float64 {
+	if m != nil && m.CpuPercentage != nil {
+		return *m.CpuPercentage
+	}
+	return 0
+}
+
+func (m *ContainerMetric) GetMemoryBytes() uint64 {
+	if m != nil && m.MemoryBytes != nil {
+		return *m.MemoryBytes
+	}
+	return 0
+}
+
+func (m *ContainerMetric) GetDiskBytes() uint64 {
+	if m != nil && m.DiskBytes != nil {
+		return *m.DiskBytes
+	}
+	return 0
+}
+
 func init() {
 }
