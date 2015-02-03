@@ -3,9 +3,7 @@ notifications:
   email:
   - cf-lamb@pivotallabs.com
 before_install:
-- 'echo "TRAVIS_GO_VERSION=${TRAVIS_GO_VERSION}"'
-- 'if [[ "${TRAVIS_GO_VERSION}" =~ 1.[2-3] ]]; then echo "go version 1.2-1.3"; go get code.google.com/p/go.tools/cmd/cover; else echo "go version 1.4+"; go get golang.org/x/tools/cmd/cover; fi'
-- go get code.google.com/p/go.tools/cmd/cover
+- 'if [[ "${TRAVIS_GO_VERSION}" =~ 1.[2-3] ]]; then go get code.google.com/p/go.tools/cmd/cover; else go get golang.org/x/tools/cmd/cover; fi'
 - go get github.com/mattn/goveralls
 - go get github.com/onsi/ginkgo/ginkgo
 after_success:
