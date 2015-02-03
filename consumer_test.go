@@ -11,12 +11,12 @@ import (
 	"sync"
 	"time"
 
-	"code.google.com/p/gogoprotobuf/proto"
 	"github.com/cloudfoundry/loggregatorlib/loggertesthelper"
 	"github.com/cloudfoundry/loggregatorlib/server/handlers"
 	"github.com/cloudfoundry/noaa"
 	noaa_errors "github.com/cloudfoundry/noaa/errors"
 	"github.com/cloudfoundry/noaa/events"
+	"github.com/gogo/protobuf/proto"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
