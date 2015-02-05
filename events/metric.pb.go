@@ -48,6 +48,7 @@ func (m *ValueMetric) GetUnit() string {
 type CounterEvent struct {
 	Name             *string `protobuf:"bytes,1,req,name=name" json:"name,omitempty"`
 	Delta            *uint64 `protobuf:"varint,2,req,name=delta" json:"delta,omitempty"`
+	Total            *uint64 `protobuf:"varint,3,opt,name=total" json:"total,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
@@ -65,6 +66,13 @@ func (m *CounterEvent) GetName() string {
 func (m *CounterEvent) GetDelta() uint64 {
 	if m != nil && m.Delta != nil {
 		return *m.Delta
+	}
+	return 0
+}
+
+func (m *CounterEvent) GetTotal() uint64 {
+	if m != nil && m.Total != nil {
+		return *m.Total
 	}
 	return 0
 }
