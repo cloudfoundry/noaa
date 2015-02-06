@@ -50,6 +50,20 @@ bin/firehose_sample
 
 Multiple subscribers may connect to the firehose endpoint, each with a unique subscription_id (configurable in `main.go`). Each subscriber (in practice, a pool of clients with a common subscription_id) receives the entire stream. For each subscription_id, all data will be distributed evenly among that subscriber's client pool.
 
+
+###Container metrics
+
+The `container_metrics_sample/main.go` application streams container metrics for the specified appId.
+
+You can run the container metrics sample app like this:
+
+```
+go build -o bin/containermetrics_sample container_metrics_sample/main.go
+bin/containermetrics_sample
+```
+
+For more information to setup a test environment in order to pull container metrics look at the README.md in the container_metrics_sample.
+
 ##Development
 
 Use `go get -d -v -t ./... && ginkgo --race --randomizeAllSpecs --failOnPending --skipMeasurements --cover` to
