@@ -17,7 +17,7 @@ We can use Dropsonde to send container metrics to metron which will emit them to
 
 1. Copy out the guid value from the last bash line
 1. Paste the guid into the container_metrics_emitter.go and main.go as the appId value at the top of the files
-1. In the main.go update the DopplerAddress value by replacing '10.244.0.34.xip.io' with the value for the environment you are testing. eg: oak.cf-app.com
+1. In the main.go update the DopplerAddress value by replacing '10.244.0.34.xip.io' with the value for the environment you are testing.
 1. Start the listener
 
         export CF_ACCESS_TOKEN=`cf oauth-token | tail -n 1`
@@ -45,4 +45,3 @@ We can use Dropsonde to send container metrics to metron which will emit them to
 1. the diskBytes value should be increasing.
 1. the diskBytes value should be skipping some numbers, this is b/c we are listening on a three second window, but publishing on a one second window and are only returning the most recent result
 1. there should be only entries for the applicationId you entered with multiple instance indexes
-1. you should not see something like 'donotseethis' as the applicationId
