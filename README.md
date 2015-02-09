@@ -24,7 +24,7 @@ export CF_ACCESS_TOKEN="bearer eyJhbGciOiJSUzI1NiJ9.eyJqdGkiOiI3YmM2MzllOC0wZGM0
 
 The `sample/main.go` application streams logs for a particular app. The following environment variable needs to be set:
 
-* `APP_GUID` - You can get this value from running `$ CF_TRACE=true cf app dora | grep '"url": "/v2/apps' ` and then extracting the app guid from the request URL. Example:
+* `APP_GUID` - You can get this value from running `$ cf app dora --guid`. Example:
 
 ```
 export APP_GUID=55fdb274-d6c9-4b8c-9b1f-9b7e7f3a346c
