@@ -13,7 +13,7 @@ We can use Dropsonde to send container metrics to metron which will emit them to
         cf api api.the-env
         cf login admin
         cf push some-app
-        cf curl /v2/apps?q=name:some-app | grep \"guid\"
+        cf app some-app --guid
 
 1. Copy out the guid value from the last bash line
 1. Paste the guid into the container_metrics_emitter.go and main.go as the appId value at the top of the files
