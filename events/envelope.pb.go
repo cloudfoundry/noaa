@@ -16,6 +16,7 @@ It is generated from these files:
 
 It has these top-level messages:
 	Envelope
+	Tag
 */
 package events
 
@@ -95,6 +96,7 @@ type Envelope struct {
 	CounterEvent     *CounterEvent       `protobuf:"bytes,10,opt,name=counterEvent" json:"counterEvent,omitempty"`
 	Error            *Error              `protobuf:"bytes,11,opt,name=error" json:"error,omitempty"`
 	ContainerMetric  *ContainerMetric    `protobuf:"bytes,12,opt,name=containerMetric" json:"containerMetric,omitempty"`
+	Tags             []*Tag              `protobuf:"bytes,13,rep,name=tags" json:"tags,omitempty"`
 	XXX_unrecognized []byte              `json:"-"`
 }
 
@@ -184,6 +186,38 @@ func (m *Envelope) GetContainerMetric() *ContainerMetric {
 		return m.ContainerMetric
 	}
 	return nil
+}
+
+func (m *Envelope) GetTags() []*Tag {
+	if m != nil {
+		return m.Tags
+	}
+	return nil
+}
+
+// / Tag holds a key-value pair
+type Tag struct {
+	Key              *string `protobuf:"bytes,1,req,name=key" json:"key,omitempty"`
+	Value            *string `protobuf:"bytes,2,req,name=value" json:"value,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *Tag) Reset()         { *m = Tag{} }
+func (m *Tag) String() string { return proto.CompactTextString(m) }
+func (*Tag) ProtoMessage()    {}
+
+func (m *Tag) GetKey() string {
+	if m != nil && m.Key != nil {
+		return *m.Key
+	}
+	return ""
+}
+
+func (m *Tag) GetValue() string {
+	if m != nil && m.Value != nil {
+		return *m.Value
+	}
+	return ""
 }
 
 func init() {
