@@ -16,7 +16,6 @@ It is generated from these files:
 
 It has these top-level messages:
 	Envelope
-	Tag
 */
 package events
 
@@ -87,6 +86,10 @@ type Envelope struct {
 	Origin           *string             `protobuf:"bytes,1,req,name=origin" json:"origin,omitempty"`
 	EventType        *Envelope_EventType `protobuf:"varint,2,req,name=eventType,enum=events.Envelope_EventType" json:"eventType,omitempty"`
 	Timestamp        *int64              `protobuf:"varint,6,opt,name=timestamp" json:"timestamp,omitempty"`
+	Deployment       *string             `protobuf:"bytes,13,opt,name=deployment" json:"deployment,omitempty"`
+	Job              *string             `protobuf:"bytes,14,opt,name=job" json:"job,omitempty"`
+	Index            *string             `protobuf:"bytes,15,opt,name=index" json:"index,omitempty"`
+	Ip               *string             `protobuf:"bytes,16,opt,name=ip" json:"ip,omitempty"`
 	Heartbeat        *Heartbeat          `protobuf:"bytes,3,opt,name=heartbeat" json:"heartbeat,omitempty"`
 	HttpStart        *HttpStart          `protobuf:"bytes,4,opt,name=httpStart" json:"httpStart,omitempty"`
 	HttpStop         *HttpStop           `protobuf:"bytes,5,opt,name=httpStop" json:"httpStop,omitempty"`
@@ -96,7 +99,6 @@ type Envelope struct {
 	CounterEvent     *CounterEvent       `protobuf:"bytes,10,opt,name=counterEvent" json:"counterEvent,omitempty"`
 	Error            *Error              `protobuf:"bytes,11,opt,name=error" json:"error,omitempty"`
 	ContainerMetric  *ContainerMetric    `protobuf:"bytes,12,opt,name=containerMetric" json:"containerMetric,omitempty"`
-	Tags             []*Tag              `protobuf:"bytes,13,rep,name=tags" json:"tags,omitempty"`
 	XXX_unrecognized []byte              `json:"-"`
 }
 
@@ -123,6 +125,34 @@ func (m *Envelope) GetTimestamp() int64 {
 		return *m.Timestamp
 	}
 	return 0
+}
+
+func (m *Envelope) GetDeployment() string {
+	if m != nil && m.Deployment != nil {
+		return *m.Deployment
+	}
+	return ""
+}
+
+func (m *Envelope) GetJob() string {
+	if m != nil && m.Job != nil {
+		return *m.Job
+	}
+	return ""
+}
+
+func (m *Envelope) GetIndex() string {
+	if m != nil && m.Index != nil {
+		return *m.Index
+	}
+	return ""
+}
+
+func (m *Envelope) GetIp() string {
+	if m != nil && m.Ip != nil {
+		return *m.Ip
+	}
+	return ""
 }
 
 func (m *Envelope) GetHeartbeat() *Heartbeat {
@@ -186,38 +216,6 @@ func (m *Envelope) GetContainerMetric() *ContainerMetric {
 		return m.ContainerMetric
 	}
 	return nil
-}
-
-func (m *Envelope) GetTags() []*Tag {
-	if m != nil {
-		return m.Tags
-	}
-	return nil
-}
-
-// / Tag holds a key-value pair
-type Tag struct {
-	Key              *string `protobuf:"bytes,1,req,name=key" json:"key,omitempty"`
-	Value            *string `protobuf:"bytes,2,req,name=value" json:"value,omitempty"`
-	XXX_unrecognized []byte  `json:"-"`
-}
-
-func (m *Tag) Reset()         { *m = Tag{} }
-func (m *Tag) String() string { return proto.CompactTextString(m) }
-func (*Tag) ProtoMessage()    {}
-
-func (m *Tag) GetKey() string {
-	if m != nil && m.Key != nil {
-		return *m.Key
-	}
-	return ""
-}
-
-func (m *Tag) GetValue() string {
-	if m != nil && m.Value != nil {
-		return *m.Value
-	}
-	return ""
 }
 
 func init() {
