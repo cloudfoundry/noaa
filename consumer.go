@@ -27,7 +27,8 @@ var (
 	KeepAlive         = 25 * time.Second
 	reconnectTimeout  = 500 * time.Millisecond
 	boundaryRegexp    = regexp.MustCompile("boundary=(.*)")
-	ErrNotFound       = errors.New("/recent path not found or has issues")
+	ErrNotOK          = errors.New("unknown issue when making HTTP request to Loggregator")
+	ErrNotFound       = ErrNotOK // NotFound isn't an accurate description of how this is used; please use ErrNotOK instead
 	ErrBadResponse    = errors.New("bad server response")
 	ErrBadRequest     = errors.New("bad client request")
 	ErrLostConnection = errors.New("remote server terminated connection unexpectedly")
@@ -283,7 +284,7 @@ func checkForErrors(resp *http.Response) error {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return ErrNotFound
+		return ErrNotOK
 	}
 	return nil
 }
