@@ -12,6 +12,8 @@ var _ = proto.Marshal
 var _ = math.Inf
 
 // / Type representing a 128-bit UUID.
+//
+// The bytes of the UUID should be packed in little-endian **byte** (not bit) order. For example, the UUID `f47ac10b-58cc-4372-a567-0e02b2c3d479` should be encoded as `UUID{ low: 0x7243cc580bc17af4, high: 0x79d4c3b2020e67a5 }`
 type UUID struct {
 	Low              *uint64 `protobuf:"varint,1,req,name=low" json:"low,omitempty"`
 	High             *uint64 `protobuf:"varint,2,req,name=high" json:"high,omitempty"`
