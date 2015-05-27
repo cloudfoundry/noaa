@@ -33,7 +33,7 @@ func main() {
 	go func() {
 		defer close(msgChan)
 		errorChan := make(chan error)
-		go connection.Stream(appGuid, authToken, msgChan, errorChan, nil)
+		go connection.Stream(appGuid, authToken, msgChan, errorChan)
 
 		for err := range errorChan {
 			fmt.Fprintf(os.Stderr, "%v\n", err.Error())

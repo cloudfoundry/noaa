@@ -43,21 +43,22 @@ type Consumer struct {
 	proxy                func(*http.Request) (*url.URL, error)
 	debugPrinter         DebugPrinter
 	sync.RWMutex
+	stopChan chan struct{}
 }
 
 // NewConsumer creates a new consumer to a traffic controller.
 func NewConsumer(trafficControllerUrl string, tlsConfig *tls.Config, proxy func(*http.Request) (*url.URL, error)) *Consumer {
-	return &Consumer{trafficControllerUrl: trafficControllerUrl, tlsConfig: tlsConfig, proxy: proxy, debugPrinter: nullDebugPrinter{}}
+	return &Consumer{trafficControllerUrl: trafficControllerUrl, tlsConfig: tlsConfig, proxy: proxy, debugPrinter: nullDebugPrinter{}, stopChan: make(chan struct{})}
 }
 
 // TailingLogs behaves exactly as TailingLogsWithoutReconnect, except that it retries 5 times if the connection
 // to the remote server is lost and returns all errors from each attempt on errorChan.
-func (cnsmr *Consumer) TailingLogs(appGuid string, authToken string, outputChan chan<- *events.LogMessage, errorChan chan<- error, stopChan chan struct{}) {
+func (cnsmr *Consumer) TailingLogs(appGuid string, authToken string, outputChan chan<- *events.LogMessage, errorChan chan<- error) {
 	action := func() error {
 		return cnsmr.TailingLogsWithoutReconnect(appGuid, authToken, outputChan)
 	}
 
-	cnsmr.retryAction(action, errorChan, stopChan)
+	cnsmr.retryAction(action, errorChan)
 }
 
 // TailingLogsWithoutReconnect listens indefinitely for log messages only; other event types are dropped.
@@ -94,12 +95,12 @@ func (cnsmr *Consumer) TailingLogsWithoutReconnect(appGuid string, authToken str
 
 // Stream behaves exactly as StreamWithoutReconnect, except that it retries 5 times if the connection
 // to the remote server is lost.
-func (cnsmr *Consumer) Stream(appGuid string, authToken string, outputChan chan<- *events.Envelope, errorChan chan<- error, stopChan chan struct{}) {
+func (cnsmr *Consumer) Stream(appGuid string, authToken string, outputChan chan<- *events.Envelope, errorChan chan<- error) {
 	action := func() error {
 		return cnsmr.StreamWithoutReconnect(appGuid, authToken, outputChan)
 	}
 
-	cnsmr.retryAction(action, errorChan, stopChan)
+	cnsmr.retryAction(action, errorChan)
 }
 
 // StreamWithoutReconnect listens indefinitely for all log and event messages.
@@ -117,12 +118,12 @@ func (cnsmr *Consumer) StreamWithoutReconnect(appGuid string, authToken string, 
 
 // Firehose behaves exactly as FirehoseWithoutReconnect, except that it retries 5 times if the connection
 // to the remote server is lost.
-func (cnsmr *Consumer) Firehose(subscriptionId string, authToken string, outputChan chan<- *events.Envelope, errorChan chan<- error, stopChan chan struct{}) {
+func (cnsmr *Consumer) Firehose(subscriptionId string, authToken string, outputChan chan<- *events.Envelope, errorChan chan<- error) {
 	action := func() error {
 		return cnsmr.FirehoseWithoutReconnect(subscriptionId, authToken, outputChan)
 	}
 
-	cnsmr.retryAction(action, errorChan, stopChan)
+	cnsmr.retryAction(action, errorChan)
 }
 
 // FirehoseWithoutReconnect streams all data. All clients with the same subscriptionId will receive a proportionate share of the
@@ -300,6 +301,7 @@ func getMultipartReader(resp *http.Response) (*multipart.Reader, error) {
 func (cnsmr *Consumer) Close() error {
 	cnsmr.Lock()
 	defer cnsmr.Unlock()
+	defer close(cnsmr.stopChan)
 	if cnsmr.ws == nil {
 		return errors.New("connection does not exist")
 	}
@@ -430,7 +432,7 @@ func (cnsmr *Consumer) proxyDial(network, addr string) (net.Conn, error) {
 	return proxyConn, nil
 }
 
-func (cnsmr *Consumer) retryAction(action func() error, errorChan chan<- error, stopChan chan struct{}) {
+func (cnsmr *Consumer) retryAction(action func() error, errorChan chan<- error) {
 	reconnectAttempts := 0
 
 	oldConnectCallback := cnsmr.callback
@@ -446,20 +448,13 @@ func (cnsmr *Consumer) retryAction(action func() error, errorChan chan<- error, 
 	}
 
 	for ; reconnectAttempts < 5; reconnectAttempts++ {
-		errChan := make(chan error)
 		select {
-		case <-stopChan:
-			cnsmr.Close()
+		case <-cnsmr.stopChan:
 			return
 		default:
 		}
 
-		go func() {
-			errChan <- action()
-		}()
-
-		err := <-errChan
-		errorChan <- err
+		errorChan <- action()
 		time.Sleep(reconnectTimeout)
 	}
 }

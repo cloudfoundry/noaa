@@ -24,7 +24,7 @@ func main() {
 	go func() {
 		defer close(msgChan)
 		errorChan := make(chan error)
-		go connection.Firehose(firehoseSubscriptionId, authToken, msgChan, errorChan, nil)
+		go connection.Firehose(firehoseSubscriptionId, authToken, msgChan, errorChan)
 
 		for err := range errorChan {
 			fmt.Fprintf(os.Stderr, "%v\n", err.Error())
