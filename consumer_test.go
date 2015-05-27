@@ -1214,8 +1214,8 @@ func createContainerMetric(instanceIndex int32, timestamp int64) *events.Envelop
 		ApplicationId: proto.String("appId"),
 		InstanceIndex: proto.Int32(instanceIndex),
 		CpuPercentage: proto.Float64(1),
-		MemoryBytes: proto.Uint64(2),
-		DiskBytes: proto.Uint64(3),
+		MemoryBytes:   proto.Uint64(2),
+		DiskBytes:     proto.Uint64(3),
 	}
 
 	return &events.Envelope{
