@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/cloudfoundry/noaa"
-	"github.com/cloudfoundry/noaa/events"
+	"github.com/cloudfoundry/sonde-go/events"
 )
 
 var dopplerAddress = os.Getenv("DOPPLER_ADDR")
