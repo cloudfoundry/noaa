@@ -6,9 +6,8 @@ import (
 	"time"
 )
 
-var appId = "60a13b0f-fce7-4c02-b92a-d43d583877ed"
-
 func main() {
+	appID := "60a13b0f-fce7-4c02-b92a-d43d583877ed"
 	err := dropsonde.Initialize("localhost:3457", "METRIC-TEST", "z1", "0")
 	if err != nil {
 		println(err.Error())
