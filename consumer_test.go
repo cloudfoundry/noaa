@@ -201,7 +201,7 @@ var _ = Describe("Noaa", func() {
 				})
 
 				It("does not include metrics", func(done Done) {
-					fakeHandler.InputChan <- marshalMessage(createHeartbeat(1, 2, 3, 4))
+					fakeHandler.InputChan <- marshalMessage(createContainerMetric(int32(1), int64(2)))
 					fakeHandler.InputChan <- marshalMessage(createMessage("hello", 0))
 
 					perform()
@@ -1258,25 +1258,6 @@ func createLogMessage(message string, timestamp int64) *events.LogMessage {
 		AppId:       proto.String("my-app-guid"),
 		SourceType:  proto.String("DEA"),
 		Timestamp:   proto.Int64(timestamp),
-	}
-}
-
-func createHeartbeat(sentCount, receivedCount, errorCount uint64, timestamp int64) *events.Envelope {
-	if timestamp == 0 {
-		timestamp = time.Now().UnixNano()
-	}
-
-	heartbeat := &events.Heartbeat{
-		SentCount:     proto.Uint64(sentCount),
-		ReceivedCount: proto.Uint64(receivedCount),
-		ErrorCount:    proto.Uint64(errorCount),
-	}
-
-	return &events.Envelope{
-		Heartbeat: heartbeat,
-		EventType: events.Envelope_Heartbeat.Enum(),
-		Origin:    proto.String("fake-origin-1"),
-		Timestamp: proto.Int64(timestamp),
 	}
 }
 
