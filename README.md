@@ -47,11 +47,18 @@ bin/sample
 
 The `firehose_sample/main.go` application streams metrics data and logs for all apps. 
 
-You can run the firehose sample app like this:
+There are two ways to run the firehose sample app: using `go get` or cloning the repo with git into your `$GOPATH`. If you used `go get`, any dependencies will already be included; if you cloned by hand, you can fetch dependencies with the following commands:
+
+```bash
+cd $GOPATH/src/github.com/cloudfoundry/noaa
+go get ./... # Fetches dependencies
+```
+
+Once dependencies are retrieved, you can run the firehose sample app like this:
 
 ```
 go build -o bin/firehose_sample firehose_sample/main.go
-bin/firehose_sample
+DOPPLER_ADDR="..." CF_ACCESS_TOKEN="..." bin/firehose_sample
 ```
 
 Multiple subscribers may connect to the firehose endpoint, each with a unique subscription_id (configurable in `main.go`). Each subscriber (in practice, a pool of clients with a common subscription_id) receives the entire stream. For each subscription_id, all data will be distributed evenly among that subscriber's client pool.
