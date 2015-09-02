@@ -17,6 +17,7 @@ script: PATH=$HOME/gopath/bin:$PATH bin/test
 
 go:
 - 1.4
+- 1.5
 - tip
 
 matrix:
