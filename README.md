@@ -51,7 +51,7 @@ export CF_ACCESS_TOKEN="bearer eyJhbGciOiJSUzI1NiJ9.eyJqdGkiOiI3YmM2MzllOC0wZGM0
 * `DOPPLER_ADDR` - It is based on your environment. Example:
 
 ```bash
-export DOPPLER_ADDR="wss://doppler.10.244.0.34.xip.io:443"
+export DOPPLER_ADDR="wss://doppler.10.244.0.34.xip.io:4443"
 ```
 
 
