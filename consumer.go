@@ -82,13 +82,16 @@ func (cnsmr *Consumer) TailingLogsWithoutReconnect(appGuid string, authToken str
 	}()
 
 	go func() {
-		defer close(allEvents)
-
 		for event := range allEvents {
 			if *event.EventType == events.Envelope_LogMessage {
 				outputChan <- event.GetLogMessage()
 			}
 		}
+	}()
+
+	go func() {
+		<-cnsmr.stopChan
+		close(allEvents)
 	}()
 
 	return <-errChan
