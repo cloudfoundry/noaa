@@ -1,9 +1,10 @@
 package main
 
 import (
+	"time"
+
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/metrics"
-	"time"
 )
 
 func main() {

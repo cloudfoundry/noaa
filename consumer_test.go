@@ -8,13 +8,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"sync"
 	"time"
 
 	"github.com/cloudfoundry/loggregatorlib/loggertesthelper"
 	"github.com/cloudfoundry/loggregatorlib/server/handlers"
 	"github.com/cloudfoundry/noaa"
 	noaa_errors "github.com/cloudfoundry/noaa/errors"
+	"github.com/cloudfoundry/noaa/test_helpers"
 	"github.com/cloudfoundry/sonde-go/events"
 	"github.com/gogo/protobuf/proto"
 
@@ -22,12 +22,12 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Noaa", func() {
+var _ = FDescribe("Noaa", func() {
 	var (
 		cnsmr                *noaa.Consumer
 		trafficControllerUrl string
 		testServer           *httptest.Server
-		fakeHandler          *FakeHandler
+		fakeHandler          *test_helpers.FakeHandler
 		tlsSettings          *tls.Config
 		consumerProxyFunc    func(*http.Request) (*url.URL, error)
 
@@ -115,7 +115,7 @@ var _ = Describe("Noaa", func() {
 	})
 
 	var startFakeTrafficController = func() {
-		fakeHandler = &FakeHandler{
+		fakeHandler = &test_helpers.FakeHandler{
 			InputChan: make(chan []byte, 10),
 			GenerateHandler: func(input chan []byte) http.Handler {
 				return handlers.NewWebsocketHandler(input, 100*time.Millisecond, loggertesthelper.Logger())
@@ -128,12 +128,12 @@ var _ = Describe("Noaa", func() {
 	}
 
 	Describe("Debug Printing", func() {
-		var debugPrinter *fakeDebugPrinter
+		var debugPrinter *test_helpers.FakeDebugPrinter
 
 		BeforeEach(func() {
 			startFakeTrafficController()
 
-			debugPrinter = &fakeDebugPrinter{}
+			debugPrinter = &test_helpers.FakeDebugPrinter{}
 			cnsmr = noaa.NewConsumer(trafficControllerUrl, tlsSettings, consumerProxyFunc)
 			cnsmr.SetDebugPrinter(debugPrinter)
 		})
@@ -218,7 +218,7 @@ var _ = Describe("Noaa", func() {
 					perform()
 					fakeHandler.Close()
 
-					Eventually(fakeHandler.getLastURL).Should(ContainSubstring("/apps/the-app-guid/stream"))
+					Eventually(fakeHandler.GetLastURL).Should(ContainSubstring("/apps/the-app-guid/stream"))
 				})
 
 				It("sends an Authorization header with an access token", func() {
@@ -226,7 +226,7 @@ var _ = Describe("Noaa", func() {
 					perform()
 					fakeHandler.Close()
 
-					Eventually(fakeHandler.getAuthHeader).Should(Equal("auth-token"))
+					Eventually(fakeHandler.GetAuthHeader).Should(Equal("auth-token"))
 				})
 
 				Context("when remote connection dies unexpectedly", func() {
@@ -354,7 +354,7 @@ var _ = Describe("Noaa", func() {
 		})
 
 		It("attempts to connect five times", func() {
-			fakeHandler.fail = true
+			fakeHandler.Fail = true
 			perform()
 
 			fakeHandler.Close()
@@ -403,16 +403,16 @@ var _ = Describe("Noaa", func() {
 		}, 10)
 
 		It("will not attempt reconnect if consumer is closed", func() {
-			fakeHandler.fail = true
+			fakeHandler.Fail = true
 
 			perform()
 			Eventually(errorChan).Should(Receive())
-			Expect(fakeHandler.wasCalled()).To(BeTrue())
+			Expect(fakeHandler.WasCalled()).To(BeTrue())
 			fakeHandler.Reset()
 			cnsmr.Close()
 
 			Eventually(errorChan).Should(BeClosed())
-			Consistently(fakeHandler.wasCalled, 2).Should(BeFalse())
+			Consistently(fakeHandler.WasCalled, 2).Should(BeFalse())
 			Eventually(doneChan, 5).Should(BeClosed())
 		})
 	})
@@ -461,7 +461,7 @@ var _ = Describe("Noaa", func() {
 					perform()
 					fakeHandler.Close()
 
-					Eventually(fakeHandler.getLastURL).Should(ContainSubstring("/apps/the-app-guid/stream"))
+					Eventually(fakeHandler.GetLastURL).Should(ContainSubstring("/apps/the-app-guid/stream"))
 				})
 
 				It("sends an Authorization header with an access token", func() {
@@ -469,7 +469,7 @@ var _ = Describe("Noaa", func() {
 					perform()
 					fakeHandler.Close()
 
-					Eventually(fakeHandler.getAuthHeader).Should(Equal("auth-token"))
+					Eventually(fakeHandler.GetAuthHeader).Should(Equal("auth-token"))
 				})
 
 				Context("when the message fails to parse", func() {
@@ -563,7 +563,7 @@ var _ = Describe("Noaa", func() {
 		})
 
 		It("attempts to connect five times", func() {
-			fakeHandler.fail = true
+			fakeHandler.Fail = true
 			perform()
 
 			fakeHandler.Close()
@@ -643,7 +643,7 @@ var _ = Describe("Noaa", func() {
 				perform()
 				fakeHandler.Close()
 
-				Eventually(fakeHandler.wasCalled).Should(BeTrue())
+				Eventually(fakeHandler.WasCalled).Should(BeTrue())
 				connErr := cnsmr.Close()
 				Expect(connErr.Error()).To(ContainSubstring("use of closed network connection"))
 
@@ -719,8 +719,8 @@ var _ = Describe("Noaa", func() {
 
 		Context("when the content length is unknown", func() {
 			BeforeEach(func() {
-				fakeHandler = &FakeHandler{
-					contentLen: "-1",
+				fakeHandler = &test_helpers.FakeHandler{
+					ContentLen: "-1",
 					InputChan:  make(chan []byte, 10),
 					GenerateHandler: func(input chan []byte) http.Handler {
 						return handlers.NewHttpHandler(input, loggertesthelper.Logger())
@@ -900,8 +900,8 @@ var _ = Describe("Noaa", func() {
 
 		Context("when the content length is unknown", func() {
 			BeforeEach(func() {
-				fakeHandler = &FakeHandler{
-					contentLen: "-1",
+				fakeHandler = &test_helpers.FakeHandler{
+					ContentLen: "-1",
 					InputChan:  make(chan []byte, 10),
 					GenerateHandler: func(input chan []byte) http.Handler {
 						return handlers.NewHttpHandler(input, loggertesthelper.Logger())
@@ -1025,7 +1025,7 @@ var _ = Describe("Noaa", func() {
 		})
 
 		It("attempts to connect five times", func() {
-			fakeHandler.fail = true
+			fakeHandler.Fail = true
 			perform()
 
 			fakeHandler.Close()
@@ -1121,7 +1121,7 @@ var _ = Describe("Noaa", func() {
 					perform()
 					fakeHandler.Close()
 
-					Eventually(fakeHandler.getLastURL).Should(ContainSubstring("/firehose/subscription-id"))
+					Eventually(fakeHandler.GetLastURL).Should(ContainSubstring("/firehose/subscription-id"))
 				})
 
 				It("sends an Authorization header with an access token", func() {
@@ -1129,7 +1129,7 @@ var _ = Describe("Noaa", func() {
 					perform()
 					fakeHandler.Close()
 
-					Eventually(fakeHandler.getAuthHeader).Should(Equal("auth-token"))
+					Eventually(fakeHandler.GetAuthHeader).Should(Equal("auth-token"))
 				})
 
 				Context("when the message fails to parse", func() {
@@ -1294,95 +1294,4 @@ func (failer authFailer) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("WWW-Authenticate", "Basic")
 	rw.WriteHeader(http.StatusUnauthorized)
 	fmt.Fprintf(rw, "You are not authorized. %s", failer.Message)
-}
-
-type FakeHandler struct {
-	GenerateHandler func(chan []byte) http.Handler
-	InputChan       chan []byte
-	called          bool
-	lastURL         string
-	authHeader      string
-	contentLen      string
-	fail            bool
-	sync.RWMutex
-}
-
-func (fh *FakeHandler) getAuthHeader() string {
-	fh.RLock()
-	defer fh.RUnlock()
-	return fh.authHeader
-}
-
-func (fh *FakeHandler) setAuthHeader(authHeader string) {
-	fh.Lock()
-	defer fh.Unlock()
-	fh.authHeader = authHeader
-}
-
-func (fh *FakeHandler) getLastURL() string {
-	fh.RLock()
-	defer fh.RUnlock()
-	return fh.lastURL
-}
-
-func (fh *FakeHandler) setLastURL(url string) {
-	fh.Lock()
-	defer fh.Unlock()
-	fh.lastURL = url
-}
-
-func (fh *FakeHandler) call() {
-	fh.Lock()
-	defer fh.Unlock()
-	fh.called = true
-}
-
-func (fh *FakeHandler) wasCalled() bool {
-	fh.RLock()
-	defer fh.RUnlock()
-	return fh.called
-}
-
-func (fh *FakeHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
-	fh.setLastURL(r.URL.String())
-	fh.setAuthHeader(r.Header.Get("Authorization"))
-	fh.call()
-	if len(fh.contentLen) > 0 {
-		rw.Header().Set("Content-Length", fh.contentLen)
-	}
-
-	fh.Lock()
-	defer fh.Unlock()
-
-	if fh.fail {
-		return
-	}
-
-	handler := fh.GenerateHandler(fh.InputChan)
-	handler.ServeHTTP(rw, r)
-}
-
-func (fh *FakeHandler) Close() {
-	close(fh.InputChan)
-}
-
-func (fh *FakeHandler) Reset() {
-	fh.Lock()
-	defer fh.Unlock()
-
-	fh.InputChan = make(chan []byte)
-	fh.called = false
-}
-
-type fakeDebugPrinter struct {
-	Messages []*fakeDebugPrinterMessage
-}
-
-type fakeDebugPrinterMessage struct {
-	Title, Body string
-}
-
-func (p *fakeDebugPrinter) Print(title, body string) {
-	message := &fakeDebugPrinterMessage{title, body}
-	p.Messages = append(p.Messages, message)
 }

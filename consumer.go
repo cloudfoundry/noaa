@@ -49,7 +49,7 @@ type Consumer struct {
 
 // NewConsumer creates a new consumer to a traffic controller.
 func NewConsumer(trafficControllerUrl string, tlsConfig *tls.Config, proxy func(*http.Request) (*url.URL, error)) *Consumer {
-	return &Consumer{trafficControllerUrl: trafficControllerUrl, tlsConfig: tlsConfig, proxy: proxy, debugPrinter: nullDebugPrinter{}, stopChan: make(chan struct{})}
+	return &Consumer{trafficControllerUrl: trafficControllerUrl, tlsConfig: tlsConfig, proxy: proxy, debugPrinter: NullDebugPrinter{}, stopChan: make(chan struct{})}
 }
 
 // TailingLogs behaves exactly as TailingLogsWithoutReconnect, except that it retries 5 times if the connection
