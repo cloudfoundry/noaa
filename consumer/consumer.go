@@ -30,14 +30,19 @@ type Consumer struct {
 	callback             func()
 	proxy                func(*http.Request) (*url.URL, error)
 	debugPrinter         noaa.DebugPrinter
-	idleTimeout          time.Duration
-	sync.RWMutex
-	stopChan chan struct{}
+	conLock              sync.RWMutex
+	stopped              bool
+	stoppedLock          sync.Mutex
 }
 
 // NewConsumer creates a new consumer to a traffic controller.
 func New(trafficControllerUrl string, tlsConfig *tls.Config, proxy func(*http.Request) (*url.URL, error)) *Consumer {
-	return &Consumer{trafficControllerUrl: trafficControllerUrl, tlsConfig: tlsConfig, proxy: proxy, debugPrinter: noaa.NullDebugPrinter{}, stopChan: make(chan struct{})}
+	return &Consumer{
+		trafficControllerUrl: trafficControllerUrl,
+		tlsConfig:            tlsConfig,
+		proxy:                proxy,
+		debugPrinter:         noaa.NullDebugPrinter{},
+	}
 }
 
 /*
@@ -63,38 +68,27 @@ func (cnsmr *Consumer) SetDebugPrinter(debugPrinter noaa.DebugPrinter) {
 
 // TailingLogsWithoutReconnect listens indefinitely for log messages only; other event types are dropped.
 //
-// If you wish to be able to terminate the listen early, close the returned output channel
-// when you are finished listening. It is the responsibility of the consumer of the output channel
-// to close it.
+// The returned channel of log messages will be closed after an error is returned when
+// reading from the connection.  When the connection is closed, the output and error
+// channels will be closed.
 //
-// Messages are presented in the order received from the loggregator server. Chronological or
-// other ordering is not guaranteed. It is the responsibility of the consumer of these channels
-// to provide any desired sorting mechanism.
+// The returned error channel has a buffer size of 1 so that it can contain the final
+// from the connection, or nil if the connection was intentionally closed.
 func (cnsmr *Consumer) TailingLogsWithoutReconnect(appGuid string, authToken string) (<-chan *events.LogMessage, <-chan error) {
-	allEvents := make(chan *events.Envelope)
 	outputChan := make(chan *events.LogMessage)
+	errChan := make(chan error, 1)
+	callback := func(env *events.Envelope) {
+		if env.GetEventType() == events.Envelope_LogMessage {
+			outputChan <- env.GetLogMessage()
+		}
+	}
 
 	streamPath := fmt.Sprintf("/apps/%s/stream", appGuid)
-	errChan := make(chan error)
 	go func() {
-		err := cnsmr.stream(streamPath, authToken, allEvents)
-		errChan <- err
-		close(errChan)
-	}()
-
-	go func() {
+		defer close(errChan)
 		defer close(outputChan)
-		for event := range allEvents {
-			if *event.EventType == events.Envelope_LogMessage {
-				outputChan <- event.GetLogMessage()
-			}
-		}
-	}()
-
-	go func() {
-		<-cnsmr.stopChan
-		//close(outputChan)
-		close(allEvents)
+		err := cnsmr.stream(streamPath, authToken, callback)
+		errChan <- err
 	}()
 
 	return outputChan, errChan
@@ -102,9 +96,9 @@ func (cnsmr *Consumer) TailingLogsWithoutReconnect(appGuid string, authToken str
 
 // Close terminates the websocket connection to traffic controller.
 func (cnsmr *Consumer) Close() error {
-	cnsmr.Lock()
-	defer cnsmr.Unlock()
-	defer close(cnsmr.stopChan)
+	cnsmr.conLock.Lock()
+	defer cnsmr.conLock.Unlock()
+	defer cnsmr.stop()
 	if cnsmr.ws == nil {
 		return errors.New("connection does not exist")
 	}
@@ -113,28 +107,44 @@ func (cnsmr *Consumer) Close() error {
 	return cnsmr.ws.Close()
 }
 
-func (cnsmr *Consumer) stream(streamPath string, authToken string, outputChan chan<- *events.Envelope) error {
+func (cnsmr *Consumer) Closed() bool {
+	cnsmr.stoppedLock.Lock()
+	defer cnsmr.stoppedLock.Unlock()
+	return cnsmr.stopped
+}
+
+func (cnsmr *Consumer) stop() {
+	cnsmr.stoppedLock.Lock()
+	defer cnsmr.stoppedLock.Unlock()
+	cnsmr.stopped = true
+}
+
+func (cnsmr *Consumer) stream(streamPath string, authToken string, callback func(*events.Envelope)) error {
 	var err error
 
-	cnsmr.Lock()
+	cnsmr.conLock.Lock()
 	cnsmr.ws, err = cnsmr.establishWebsocketConnection(streamPath, authToken)
-	cnsmr.Unlock()
+	cnsmr.conLock.Unlock()
 
 	if err != nil {
 		return err
 	}
 
-	return cnsmr.listenForMessages(outputChan)
+	return cnsmr.listenForMessages(callback)
 }
 
-func (cnsmr *Consumer) listenForMessages(msgChan chan<- *events.Envelope) error {
+func (cnsmr *Consumer) listenForMessages(callback func(*events.Envelope)) error {
 	defer cnsmr.ws.Close()
 
 	for {
-		if cnsmr.idleTimeout != 0 {
-			cnsmr.ws.SetReadDeadline(time.Now().Add(cnsmr.idleTimeout))
-		}
 		_, data, err := cnsmr.ws.ReadMessage()
+
+		// If the connection was closed (i.e. if cnsmr.Close() was called), we
+		// will have a non-nil error, but we want to return a nil error.
+		if cnsmr.Closed() {
+			return nil
+		}
+
 		if err != nil {
 			return err
 		}
@@ -145,7 +155,7 @@ func (cnsmr *Consumer) listenForMessages(msgChan chan<- *events.Envelope) error 
 			continue
 		}
 
-		msgChan <- envelope
+		callback(envelope)
 	}
 }
 
@@ -258,10 +268,8 @@ func (cnsmr *Consumer) retryAction(action func() error, errorChan chan<- error) 
 	}
 
 	for ; reconnectAttempts < 5; reconnectAttempts++ {
-		select {
-		case <-cnsmr.stopChan:
+		if cnsmr.Closed() {
 			return
-		default:
 		}
 
 		errorChan <- action()

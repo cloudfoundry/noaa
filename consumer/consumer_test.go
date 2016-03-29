@@ -1,9 +1,7 @@
 package consumer_test
 
 import (
-	"bytes"
 	"crypto/tls"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -34,11 +32,6 @@ var _ = Describe("Consumer", func() {
 		authToken      string
 		messagesToSend chan []byte
 	)
-
-	BeforeSuite(func() {
-		buf := &bytes.Buffer{}
-		log.SetOutput(buf)
-	})
 
 	BeforeEach(func() {
 		messagesToSend = make(chan []byte, 256)
