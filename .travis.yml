@@ -18,11 +18,11 @@ script: PATH=$HOME/gopath/bin:$PATH bin/test
 go:
 - 1.4
 - 1.5
+- 1.6
 - tip
 
 matrix:
   allow_failures:
-    - go: 1.5
     - go: tip
 
 env:
