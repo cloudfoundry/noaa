@@ -55,14 +55,14 @@ var _ = Describe("Consumer", func() {
 		})
 
 		It("sets a callback and calls it when connecting", func() {
-			called := false
-			cb := func() { called = true }
+			called := make(chan bool)
+			cb := func() { called <- true }
 
 			cnsmr.SetOnConnectCallback(cb)
 
 			cnsmr.TailingLogsWithoutReconnect(appGuid, authToken)
 
-			Eventually(func() bool { return called }).Should(BeTrue())
+			Eventually(called).Should(Receive())
 		})
 
 		Context("when the connection fails", func() {
@@ -71,13 +71,13 @@ var _ = Describe("Consumer", func() {
 			})
 
 			It("does not call the callback", func() {
-				called := false
-				cb := func() { called = true }
+				called := make(chan bool)
+				cb := func() { called <- true }
 
 				cnsmr.SetOnConnectCallback(cb)
 				cnsmr.TailingLogsWithoutReconnect(appGuid, authToken)
 
-				Consistently(func() bool { return called }).Should(BeFalse())
+				Consistently(called).ShouldNot(Receive())
 			})
 		})
 
@@ -120,14 +120,14 @@ var _ = Describe("Consumer", func() {
 	}
 
 	Describe("Debug Printing", func() {
-		var debugPrinter *test_helpers.FakeDebugPrinter
+		var debugPrinter *mockDebugPrinter
 
 		BeforeEach(func() {
 			startFakeTrafficController()
 		})
 
 		JustBeforeEach(func() {
-			debugPrinter = &test_helpers.FakeDebugPrinter{}
+			debugPrinter = newMockDebugPrinter()
 			cnsmr.SetDebugPrinter(debugPrinter)
 		})
 
@@ -136,8 +136,9 @@ var _ = Describe("Consumer", func() {
 
 			cnsmr.TailingLogsWithoutReconnect(appGuid, authToken)
 
-			Eventually(func() int { return len(debugPrinter.Messages) }).Should(BeNumerically(">=", 1))
-			Expect(debugPrinter.Messages[0].Body).To(ContainSubstring("Sec-WebSocket-Version: 13"))
+			var body string
+			Eventually(debugPrinter.PrintInput.Dump).Should(Receive(&body))
+			Expect(body).To(ContainSubstring("Sec-WebSocket-Version: 13"))
 		})
 
 		It("does not include messages sent or received", func() {
@@ -146,8 +147,9 @@ var _ = Describe("Consumer", func() {
 			fakeHandler.Close()
 			cnsmr.TailingLogsWithoutReconnect(appGuid, authToken)
 
-			Eventually(func() int { return len(debugPrinter.Messages) }).Should(BeNumerically(">=", 1))
-			Expect(debugPrinter.Messages[0].Body).ToNot(ContainSubstring("hello"))
+			var body string
+			Eventually(debugPrinter.PrintInput.Dump).Should(Receive(&body))
+			Expect(body).ToNot(ContainSubstring("hello"))
 		})
 	})
 

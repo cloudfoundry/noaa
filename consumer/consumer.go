@@ -22,6 +22,12 @@ import (
 
 const reconnectTimeout = 500 * time.Millisecond
 
+//go:generate hel --type DebugPrinter --output mock_debug_printer_test.go
+
+type DebugPrinter interface {
+	Print(title, dump string)
+}
+
 // Consumer represents the actions that can be performed against traffic controller.
 type Consumer struct {
 	trafficControllerUrl string
@@ -29,7 +35,7 @@ type Consumer struct {
 	ws                   *websocket.Conn
 	callback             func()
 	proxy                func(*http.Request) (*url.URL, error)
-	debugPrinter         noaa.DebugPrinter
+	debugPrinter         DebugPrinter
 	conLock              sync.RWMutex
 	stopped              bool
 	stoppedLock          sync.Mutex
