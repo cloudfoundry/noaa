@@ -22,7 +22,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = FDescribe("Noaa", func() {
+var _ = Describe("Noaa", func() {
 	var (
 		cnsmr                *noaa.Consumer
 		trafficControllerUrl string
