@@ -262,7 +262,6 @@ func (c *Consumer) retryAction(action func() error, errors chan<- error, retries
 
 func (c *Consumer) establishWebsocketConnection(path string, authToken string) (*websocket.Conn, error) {
 	header := http.Header{"Origin": []string{"http://localhost"}, "Authorization": []string{authToken}}
-	dialer := websocket.Dialer{NetDial: c.proxyDial, TLSClientConfig: c.tlsConfig}
 	url := c.trafficControllerUrl + path
 
 	c.debugPrinter.Print("WEBSOCKET REQUEST:",
@@ -271,7 +270,7 @@ func (c *Consumer) establishWebsocketConnection(path string, authToken string) (
 			"Upgrade: websocket\nConnection: Upgrade\nSec-WebSocket-Version: 13\nSec-WebSocket-Key: [HIDDEN]\n"+
 			headersString(header))
 
-	ws, resp, err := dialer.Dial(url, header)
+	ws, resp, err := c.dialer.Dial(url, header)
 	if resp != nil {
 		c.debugPrinter.Print("WEBSOCKET RESPONSE:",
 			resp.Proto+" "+resp.Status+"\n"+

@@ -41,7 +41,6 @@ type DebugPrinter interface {
 // See sync.go and async.go for traffic controller access methods.
 type Consumer struct {
 	trafficControllerUrl string
-	tlsConfig            *tls.Config
 	idleTimeout          time.Duration
 	ws                   *websocket.Conn
 	callback             func()
@@ -51,14 +50,19 @@ type Consumer struct {
 	conLock              sync.RWMutex
 	closed               bool
 	closedLock           sync.Mutex
+	client               *http.Client
+	dialer               websocket.Dialer
 }
 
 // New creates a new consumer to a traffic controller.
 func New(trafficControllerUrl string, tlsConfig *tls.Config, proxy func(*http.Request) (*url.URL, error)) *Consumer {
-	return &Consumer{
+	transport := &http.Transport{Proxy: proxy, TLSClientConfig: tlsConfig}
+	consumer := &Consumer{
 		trafficControllerUrl: trafficControllerUrl,
-		tlsConfig:            tlsConfig,
 		proxy:                proxy,
 		debugPrinter:         noaa.NullDebugPrinter{},
+		client:               &http.Client{Transport: transport},
 	}
+	consumer.dialer = websocket.Dialer{NetDial: consumer.proxyDial, TLSClientConfig: tlsConfig}
+	return consumer
 }

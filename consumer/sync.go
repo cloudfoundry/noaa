@@ -67,13 +67,11 @@ func (c *Consumer) readTC(appGuid string, authToken string, endpoint string, cal
 	}
 
 	recentPath := fmt.Sprintf("%s://%s/apps/%s/%s", scheme, trafficControllerUrl.Host, appGuid, endpoint)
-	transport := &http.Transport{Proxy: c.proxy, TLSClientConfig: c.tlsConfig}
-	client := &http.Client{Transport: transport}
 
 	req, _ := http.NewRequest("GET", recentPath, nil)
 	req.Header.Set("Authorization", authToken)
 
-	resp, err := client.Do(req)
+	resp, err := c.client.Do(req)
 	if err != nil {
 		message := `Error dialing traffic controller server: %s.
 Please ask your Cloud Foundry Operator to check the platform configuration (traffic controller endpoint is %s).`
