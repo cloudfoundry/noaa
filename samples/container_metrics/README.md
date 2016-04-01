@@ -1,49 +1,69 @@
-#Container Metrics Sample
+# Container Metrics Sample
 
-##Overview
-We can use Dropsonde to send container metrics to metron which will emit them to Doppler; which is then polled by traffic controller. The endpoint on the traffic controller should report the latest container metric for each instance of the specified app.
+## Overview
 
-`main.go` connects to the traffic controller and polls the container metrics endpoint.
+We can use Dropsonde to send container metrics to metron which will emit them
+to Doppler; which is then polled by traffic controller. The endpoint on the
+traffic controller should report the latest container metric for each instance
+of the specified app.
 
-`consumer_metrics_sample/emitter/main.go` is a sample app that emits container metrics to metron using the dropsonde library.
+`samples/container_metrics/consumer/main.go` connects to the traffic controller
+and polls the container metrics endpoint.
 
-##To see containter metrics:
-1. Run
+`samples/container_metrics/emitter/main.go` is a sample app that emits container
+metrics to metron using the dropsonde library.
 
-        cf api api.the-env
-        cf login admin
+## To see containter metrics:
+
+1. Push an app:
+
         cf push some-app
-        cf app some-app --guid
 
-1. Copy out the guid value from the last bash line
-1. Paste the guid into the container_metrics_emitter.go and main.go as the appId value at the top of the files
-1. In the main.go update the DopplerAddress value by replacing '10.244.0.34.xip.io' with the value for the environment you are testing.
-1. Start the listener
+1. Export the app's guid as an environment variable:
 
-        export CF_ACCESS_TOKEN=`cf oauth-token | tail -n 1`
-        go run consumer/main.go
+        export APP_GUID=$(cf app some-app --guid)
 
-1. Set the appId in `emitter/main.go` to the correct appId.
+1. Take note of the app GUID, you will need it later:
 
-1. Now build the container_metrics_emitter.go in a new bash window with:
+        echo $APP_GUID
 
-        GOPATH=~/go GOOS=linux go build emitter/main.go
+1. Set the doppler address as an environment variable:
 
-1. Move the container_metrics_emitter executable onto a machine with metron running inside your cf deployment
+        export DOPPLER_ADDR="wss://your-doppler.example.com/"
 
-        ssh-add keyfile
-        scp container_metrics_emitter vcap@bosh.the-env:container_metrics_emitter
-        ssh -A vcap@bosh.the-env
+1. Export your access token:
 
-1. You can get a vm ip by doing bosh vms and selecting an ip
+        export CF_ACCESS_TOKEN=$(cf oauth-token | grep bear)
 
-        scp container_metrics_emitter vcap@some.vm.ip:container_metrics_emitter
+1. Start the consumer:
+
+        go run samples/container_metrics/consumer/main.go
+
+1. Now build the emitter in a new terminal window. Make sure your $GOPATH is
+   set and run:
+
+        GOOS=linux go build -o bin/emitter samples/container_metrics/emitter/main.go
+
+1. Move the emitter executable onto a machine with metron running inside your
+   cf deployment:
+
+        scp bin/emitter vcap@bosh.example.com:emitter
+        ssh -A vcap@bosh.example.com
+
+1. You can get a VM IP by doing `bosh vms` and selecting an IP:
+
+        scp emitter vcap@some.vm.ip:emitter
         ssh vcap@some.vm.ip
-        ./container_metrics_emitter
+        export APP_GUID="YOUR-APP-GUID"
+        ./emitter
 
-1. You should now see metrics appearing in the listener window
+1. You should now see metrics appearing in the listener window.
 
-###Things to look for:
-1. the diskBytes value should be increasing.
-1. the diskBytes value should be skipping some numbers, this is b/c we are listening on a three second window, but publishing on a one second window and are only returning the most recent result
-1. there should be only entries for the applicationId you entered with multiple instance indexes
+### Things to look for:
+
+1. The diskBytes value should be increasing.
+1. The diskBytes value should be skipping some numbers, this is b/c we are
+   listening on a three second window, but publishing on a one second window
+   and are only returning the most recent result.
+1. There should be only entries for the applicationId you entered with multiple
+   instance indexes.

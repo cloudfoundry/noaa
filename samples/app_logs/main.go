@@ -5,19 +5,20 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cloudfoundry/noaa"
-	"github.com/cloudfoundry/sonde-go/events"
+	"github.com/cloudfoundry/noaa/consumer"
 )
 
-var dopplerAddress = os.Getenv("DOPPLER_ADDR")
-var appGuid = os.Getenv("APP_GUID")
-var authToken = os.Getenv("CF_ACCESS_TOKEN")
+var (
+	dopplerAddress = os.Getenv("DOPPLER_ADDR")
+	appGuid        = os.Getenv("APP_GUID")
+	authToken      = os.Getenv("CF_ACCESS_TOKEN")
+)
 
 func main() {
-	connection := noaa.NewConsumer(dopplerAddress, &tls.Config{InsecureSkipVerify: true}, nil)
-	connection.SetDebugPrinter(ConsoleDebugPrinter{})
+	consumer := consumer.New(dopplerAddress, &tls.Config{InsecureSkipVerify: true}, nil)
+	consumer.SetDebugPrinter(ConsoleDebugPrinter{})
 
-	messages, err := connection.RecentLogs(appGuid, authToken)
+	messages, err := consumer.RecentLogs(appGuid, authToken)
 
 	if err != nil {
 		fmt.Printf("===== Error getting recent messages: %v\n", err)
@@ -29,12 +30,9 @@ func main() {
 	}
 
 	fmt.Println("===== Streaming metrics")
-	msgChan := make(chan *events.Envelope)
-	go func() {
-		defer close(msgChan)
-		errorChan := make(chan error)
-		go connection.Stream(appGuid, authToken, msgChan, errorChan)
+	msgChan, errorChan := consumer.Stream(appGuid, authToken)
 
+	go func() {
 		for err := range errorChan {
 			fmt.Fprintf(os.Stderr, "%v\n", err.Error())
 		}
