@@ -129,6 +129,12 @@ func (c *Consumer) close() {
 	c.closed = true
 }
 
+func (c *Consumer) open() {
+	c.closedLock.Lock()
+	defer c.closedLock.Unlock()
+	c.closed = false
+}
+
 func (c *Consumer) onConnectCallback() func() {
 	c.callbackLock.RLock()
 	defer c.callbackLock.RUnlock()
@@ -252,6 +258,7 @@ func (c *Consumer) retryAction(action func() error, errors chan<- error, retries
 
 	for ; reconnectAttempts <= retries; reconnectAttempts++ {
 		if c.Closed() {
+			c.open()
 			return
 		}
 
