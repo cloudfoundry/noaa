@@ -375,6 +375,26 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 			Eventually(cnsmr.Closed).Should(BeFalse())
 		})
 
+		Context("with multiple connections", func() {
+			var (
+				moreLogMessages <-chan *events.LogMessage
+				moreErrors      <-chan error
+			)
+
+			JustBeforeEach(func() {
+				moreLogMessages, moreErrors = cnsmr.TailingLogs(appGuid, authToken)
+			})
+
+			It("closes all channels before reopening", func() {
+				cnsmr.Close()
+				Eventually(logMessages).Should(BeClosed())
+				Eventually(errors).Should(BeClosed())
+				Eventually(moreLogMessages).Should(BeClosed())
+				Eventually(moreErrors).Should(BeClosed())
+				Eventually(cnsmr.Closed).Should(BeFalse())
+			})
+		})
+
 		Context("with a failing handler", func() {
 			BeforeEach(func() {
 				fakeHandler.Fail = true
