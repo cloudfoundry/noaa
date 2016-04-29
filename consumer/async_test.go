@@ -371,7 +371,6 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 
 		It("resets the closed flag to false after it is no longer needed", func() {
 			cnsmr.Close()
-			Eventually(cnsmr.Closed).Should(BeTrue())
 			Eventually(cnsmr.Closed).Should(BeFalse())
 		})
 
@@ -385,7 +384,7 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 				moreLogMessages, moreErrors = cnsmr.TailingLogs(appGuid, authToken)
 			})
 
-			It("closes all channels before reopening", func() {
+			It("closes all channels", func() {
 				cnsmr.Close()
 				Eventually(logMessages).Should(BeClosed())
 				Eventually(errors).Should(BeClosed())
@@ -626,7 +625,7 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 		Context("when a connection is not open", func() {
 			It("returns an error", func() {
 				err := cnsmr.Close()
-
+				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(Equal("connection does not exist"))
 			})
 		})
@@ -643,6 +642,7 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 
 				Eventually(fakeHandler.WasCalled).Should(BeTrue())
 				connErr := cnsmr.Close()
+				Expect(connErr).To(HaveOccurred())
 				Expect(connErr.Error()).To(ContainSubstring("use of closed network connection"))
 
 				var err error

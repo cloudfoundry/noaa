@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cloudfoundry/noaa"
@@ -95,44 +96,35 @@ func (c *Consumer) SetOnConnectCallback(cb func()) {
 	c.callback = cb
 }
 
-// Close terminates the websocket connection to traffic controller.  It will
-// return an error if it has problems closing the connection.  If there is no
-// connection to close, the consumer will be closed so that no further
-// operations will be performed (including any pending retries), and an error
-// declaring "connection does not exist" will be returned.
+// Close terminates all previously opened websocket connections to the traffic
+// controller.  It will return an error if there are no open connections, or
+// if it has problems closing any connection.
+//
+// The consumer will mark itself closed once it is done, and will reopen the next
+// time a websocket connection is made.
 func (c *Consumer) Close() error {
-	c.conLock.Lock()
-	defer c.conLock.Unlock()
-	defer c.close()
-	if c.ws == nil {
+	c.connsLock.Lock()
+	defer c.connsLock.Unlock()
+	if len(c.conns) == 0 {
 		return errors.New("connection does not exist")
 	}
-
-	c.ws.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""), time.Time{})
-	return c.ws.Close()
+	for len(c.conns) > 0 {
+		if err := c.conns[0].close(); err != nil {
+			return err
+		}
+		c.conns = c.conns[1:]
+	}
+	return nil
 }
 
-// Closed returns whether or not Close has been called.
+// Closed is a legacy method that now returns false.  Consumers cannot be closed;
+// they will always be able to make more requests to the TrafficController.
 func (c *Consumer) Closed() bool {
-	c.closedLock.Lock()
-	defer c.closedLock.Unlock()
-	return c.closed
+	return false
 }
 
 func (c *Consumer) SetIdleTimeout(idleTimeout time.Duration) {
 	c.idleTimeout = idleTimeout
-}
-
-func (c *Consumer) close() {
-	c.closedLock.Lock()
-	defer c.closedLock.Unlock()
-	c.closed = true
-}
-
-func (c *Consumer) open() {
-	c.closedLock.Lock()
-	defer c.closedLock.Unlock()
-	c.closed = false
 }
 
 func (c *Consumer) onConnectCallback() func() {
@@ -175,8 +167,17 @@ func (c *Consumer) runStream(appGuid, authToken string, retries uint) (<-chan *e
 
 func (c *Consumer) streamAppData(appGuid, authToken string, callback func(*events.Envelope), errors chan<- error, retries uint) {
 	streamPath := fmt.Sprintf("/apps/%s/stream", appGuid)
-	action := func() error {
-		return c.stream(streamPath, authToken, callback)
+	conn := c.newConn(nil)
+	action := func() (error, bool) {
+		if conn.Closed() {
+			return nil, true
+		}
+		ws, err := c.establishWebsocketConnection(streamPath, authToken)
+		if err != nil {
+			return err, false
+		}
+		conn.setWebsocket(ws)
+		return c.listenForMessages(conn, callback), false
 	}
 	c.retryAction(action, errors, retries)
 }
@@ -189,8 +190,17 @@ func (c *Consumer) firehose(subID, authToken string, retries uint) (<-chan *even
 	}
 
 	streamPath := "/firehose/" + subID
-	action := func() error {
-		return c.stream(streamPath, authToken, callback)
+	conn := c.newConn(nil)
+	action := func() (error, bool) {
+		if conn.Closed() {
+			return nil, true
+		}
+		ws, err := c.establishWebsocketConnection(streamPath, authToken)
+		if err != nil {
+			return err, false
+		}
+		conn.setWebsocket(ws)
+		return c.listenForMessages(conn, callback), false
 	}
 	go func() {
 		defer close(errors)
@@ -201,31 +211,26 @@ func (c *Consumer) firehose(subID, authToken string, retries uint) (<-chan *even
 }
 
 func (c *Consumer) stream(streamPath string, authToken string, callback func(*events.Envelope)) error {
-	var err error
-
-	c.conLock.Lock()
-	c.ws, err = c.establishWebsocketConnection(streamPath, authToken)
-	c.conLock.Unlock()
-
+	ws, err := c.establishWebsocketConnection(streamPath, authToken)
 	if err != nil {
 		return err
 	}
+	conn := c.newConn(ws)
 
-	return c.listenForMessages(callback)
+	return c.listenForMessages(conn, callback)
 }
 
-func (c *Consumer) listenForMessages(callback func(*events.Envelope)) error {
-	defer c.ws.Close()
-
+func (c *Consumer) listenForMessages(conn *connection, callback func(*events.Envelope)) error {
+	ws := conn.websocket()
 	for {
 		if c.idleTimeout != 0 {
-			c.ws.SetReadDeadline(time.Now().Add(c.idleTimeout))
+			ws.SetReadDeadline(time.Now().Add(c.idleTimeout))
 		}
-		_, data, err := c.ws.ReadMessage()
+		_, data, err := ws.ReadMessage()
 
-		// If the connection was closed (i.e. if c.Close() was called), we
+		// If the connection was closed (i.e. if conn.Close() was called), we
 		// will have a non-nil error, but we want to return a nil error.
-		if c.Closed() {
+		if conn.Closed() {
 			return nil
 		}
 
@@ -243,7 +248,7 @@ func (c *Consumer) listenForMessages(callback func(*events.Envelope)) error {
 	}
 }
 
-func (c *Consumer) retryAction(action func() error, errors chan<- error, retries uint) {
+func (c *Consumer) retryAction(action func() (err error, done bool), errors chan<- error, retries uint) {
 	reconnectAttempts := uint(0)
 
 	oldConnectCallback := c.onConnectCallback()
@@ -257,14 +262,21 @@ func (c *Consumer) retryAction(action func() error, errors chan<- error, retries
 	}
 
 	for ; reconnectAttempts <= retries; reconnectAttempts++ {
-		if c.Closed() {
-			c.open()
+		err, done := action()
+		if done {
 			return
 		}
-
-		errors <- action()
+		errors <- err
 		time.Sleep(reconnectTimeout)
 	}
+}
+
+func (c *Consumer) newConn(wsConn *websocket.Conn) *connection {
+	conn := &connection{ws: wsConn}
+	c.connsLock.Lock()
+	defer c.connsLock.Unlock()
+	c.conns = append(c.conns, conn)
+	return conn
 }
 
 func (c *Consumer) establishWebsocketConnection(path string, authToken string) (*websocket.Conn, error) {
@@ -353,4 +365,41 @@ func headersString(header http.Header) string {
 		result += name + ": " + strings.Join(values, ", ") + "\n"
 	}
 	return result
+}
+
+type connection struct {
+	ws     *websocket.Conn
+	closed bool
+	lock   sync.Mutex
+}
+
+func (c *connection) websocket() *websocket.Conn {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	return c.ws
+}
+
+func (c *connection) setWebsocket(ws *websocket.Conn) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.ws = ws
+}
+
+func (c *connection) close() error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.closed = true
+
+	if c.ws == nil {
+		return errors.New("connection does not exist")
+	}
+	// TODO: check this error
+	c.ws.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""), time.Time{})
+	return c.ws.Close()
+}
+
+func (c *connection) Closed() bool {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	return c.closed
 }
