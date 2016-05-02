@@ -212,17 +212,6 @@ func (c *Consumer) firehose(subID, authToken string, retries uint) (<-chan *even
 	return outputs, errors
 }
 
-func (c *Consumer) stream(streamPath string, authToken string, callback func(*events.Envelope)) error {
-	ws, err := c.establishWebsocketConnection(streamPath, authToken)
-	if err != nil {
-		return err
-	}
-	conn := c.newConn()
-	conn.setWebsocket(ws)
-
-	return c.listenForMessages(conn, callback)
-}
-
 func (c *Consumer) listenForMessages(conn *connection, callback func(*events.Envelope)) error {
 	if conn.Closed() {
 		return nil
