@@ -99,9 +99,6 @@ func (c *Consumer) SetOnConnectCallback(cb func()) {
 // Close terminates all previously opened websocket connections to the traffic
 // controller.  It will return an error if there are no open connections, or
 // if it has problems closing any connection.
-//
-// The consumer will mark itself closed once it is done, and will reopen the next
-// time a websocket connection is made.
 func (c *Consumer) Close() error {
 	c.connsLock.Lock()
 	defer c.connsLock.Unlock()
