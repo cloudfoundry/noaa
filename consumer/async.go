@@ -141,10 +141,12 @@ func (c *Consumer) tailingLogs(appGuid, authToken string, retries uint) (<-chan 
 			outputs <- env.GetLogMessage()
 		}
 	}
+
+	conn := c.newConn()
 	go func() {
 		defer close(errors)
 		defer close(outputs)
-		c.streamAppData(appGuid, authToken, callback, errors, retries)
+		c.streamAppDataTo(conn, appGuid, authToken, callback, errors, retries)
 	}()
 	return outputs, errors
 }
@@ -157,17 +159,17 @@ func (c *Consumer) runStream(appGuid, authToken string, retries uint) (<-chan *e
 		outputs <- env
 	}
 
+	conn := c.newConn()
 	go func() {
 		defer close(errors)
 		defer close(outputs)
-		c.streamAppData(appGuid, authToken, callback, errors, retries)
+		c.streamAppDataTo(conn, appGuid, authToken, callback, errors, retries)
 	}()
 	return outputs, errors
 }
 
-func (c *Consumer) streamAppData(appGuid, authToken string, callback func(*events.Envelope), errors chan<- error, retries uint) {
+func (c *Consumer) streamAppDataTo(conn *connection, appGuid, authToken string, callback func(*events.Envelope), errors chan<- error, retries uint) {
 	streamPath := fmt.Sprintf("/apps/%s/stream", appGuid)
-	conn := c.newConn(nil)
 	action := func() (error, bool) {
 		if conn.Closed() {
 			return nil, true
@@ -190,7 +192,7 @@ func (c *Consumer) firehose(subID, authToken string, retries uint) (<-chan *even
 	}
 
 	streamPath := "/firehose/" + subID
-	conn := c.newConn(nil)
+	conn := c.newConn()
 	action := func() (error, bool) {
 		if conn.Closed() {
 			return nil, true
@@ -215,12 +217,16 @@ func (c *Consumer) stream(streamPath string, authToken string, callback func(*ev
 	if err != nil {
 		return err
 	}
-	conn := c.newConn(ws)
+	conn := c.newConn()
+	conn.setWebsocket(ws)
 
 	return c.listenForMessages(conn, callback)
 }
 
 func (c *Consumer) listenForMessages(conn *connection, callback func(*events.Envelope)) error {
+	if conn.Closed() {
+		return nil
+	}
 	ws := conn.websocket()
 	for {
 		if c.idleTimeout != 0 {
@@ -254,12 +260,12 @@ func (c *Consumer) retryAction(action func() (err error, done bool), errors chan
 	oldConnectCallback := c.onConnectCallback()
 	defer c.SetOnConnectCallback(oldConnectCallback)
 
-	c.callback = func() {
+	c.SetOnConnectCallback(func() {
 		reconnectAttempts = 0
 		if oldConnectCallback != nil {
 			oldConnectCallback()
 		}
-	}
+	})
 
 	for ; reconnectAttempts <= retries; reconnectAttempts++ {
 		err, done := action()
@@ -271,8 +277,8 @@ func (c *Consumer) retryAction(action func() (err error, done bool), errors chan
 	}
 }
 
-func (c *Consumer) newConn(wsConn *websocket.Conn) *connection {
-	conn := &connection{ws: wsConn}
+func (c *Consumer) newConn() *connection {
+	conn := &connection{}
 	c.connsLock.Lock()
 	defer c.connsLock.Unlock()
 	c.conns = append(c.conns, conn)
@@ -382,6 +388,9 @@ func (c *connection) websocket() *websocket.Conn {
 func (c *connection) setWebsocket(ws *websocket.Conn) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+	if c.closed {
+		return
+	}
 	c.ws = ws
 }
 
@@ -389,12 +398,13 @@ func (c *connection) close() error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.closed = true
-
 	if c.ws == nil {
-		return errors.New("connection does not exist")
+		return nil
 	}
-	// TODO: check this error
-	c.ws.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""), time.Time{})
+	err := c.ws.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""), time.Time{})
+	if err != nil {
+		return err
+	}
 	return c.ws.Close()
 }
 

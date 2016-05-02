@@ -627,6 +627,7 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 				err := cnsmr.Close()
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(Equal("connection does not exist"))
+				fakeHandler.Close()
 			})
 		})
 
@@ -635,20 +636,31 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 				incomings, streamErrors = cnsmr.StreamWithoutReconnect(appGuid, authToken)
 			})
 
-			It("terminates the blocking function call", func(done Done) {
-				defer close(done)
+			It("closes the outputs", func() {
+				Eventually(fakeHandler.WasCalled).Should(BeTrue())
+
+				Expect(cnsmr.Close()).To(Succeed())
+				Eventually(incomings).Should(BeClosed())
+				Eventually(streamErrors).Should(BeClosed())
 
 				fakeHandler.Close()
+			})
 
-				Eventually(fakeHandler.WasCalled).Should(BeTrue())
-				connErr := cnsmr.Close()
-				Expect(connErr).To(HaveOccurred())
-				Expect(connErr.Error()).To(ContainSubstring("use of closed network connection"))
+			Context("and the server is closed", func() {
+				JustBeforeEach(func() {
+					fakeHandler.Close()
+				})
 
-				var err error
-				Eventually(streamErrors).Should(Receive(&err))
-				Expect(err.Error()).To(ContainSubstring("websocket: close 1000"))
-			}, 10)
+				It("returns errors", func() {
+					var err error
+					Eventually(streamErrors).Should(Receive(&err))
+					Expect(err.Error()).To(ContainSubstring("websocket: close 1000"))
+
+					connErr := cnsmr.Close()
+					Expect(connErr).To(HaveOccurred())
+					Expect(connErr.Error()).To(ContainSubstring("close sent"))
+				})
+			})
 		})
 	})
 
