@@ -167,18 +167,7 @@ func (c *Consumer) runStream(appGuid, authToken string, retries uint) (<-chan *e
 
 func (c *Consumer) streamAppDataTo(conn *connection, appGuid, authToken string, callback func(*events.Envelope), errors chan<- error, retries uint) {
 	streamPath := fmt.Sprintf("/apps/%s/stream", appGuid)
-	action := func() (error, bool) {
-		if conn.Closed() {
-			return nil, true
-		}
-		ws, err := c.establishWebsocketConnection(streamPath, authToken)
-		if err != nil {
-			return err, false
-		}
-		conn.setWebsocket(ws)
-		return c.listenForMessages(conn, callback), false
-	}
-	c.retryAction(action, errors, retries)
+	c.retryAction(c.listenAction(conn, streamPath, authToken, callback), errors, retries)
 }
 
 func (c *Consumer) firehose(subID, authToken string, retries uint) (<-chan *events.Envelope, <-chan error) {
@@ -190,21 +179,10 @@ func (c *Consumer) firehose(subID, authToken string, retries uint) (<-chan *even
 
 	streamPath := "/firehose/" + subID
 	conn := c.newConn()
-	action := func() (error, bool) {
-		if conn.Closed() {
-			return nil, true
-		}
-		ws, err := c.establishWebsocketConnection(streamPath, authToken)
-		if err != nil {
-			return err, false
-		}
-		conn.setWebsocket(ws)
-		return c.listenForMessages(conn, callback), false
-	}
 	go func() {
 		defer close(errors)
 		defer close(outputs)
-		c.retryAction(action, errors, retries)
+		c.retryAction(c.listenAction(conn, streamPath, authToken, callback), errors, retries)
 	}()
 	return outputs, errors
 }
@@ -237,6 +215,20 @@ func (c *Consumer) listenForMessages(conn *connection, callback func(*events.Env
 		}
 
 		callback(envelope)
+	}
+}
+
+func (c *Consumer) listenAction(conn *connection, streamPath, authToken string, callback func(*events.Envelope)) func() (err error, done bool) {
+	return func() (error, bool) {
+		if conn.Closed() {
+			return nil, true
+		}
+		ws, err := c.establishWebsocketConnection(streamPath, authToken)
+		if err != nil {
+			return err, false
+		}
+		conn.setWebsocket(ws)
+		return c.listenForMessages(conn, callback), false
 	}
 }
 
