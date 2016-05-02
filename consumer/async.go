@@ -308,8 +308,9 @@ func (c *Consumer) establishWebsocketConnection(path string, authToken string) (
 		return ws, err
 	}
 
-	if err == nil && c.callback != nil {
-		c.callback()
+	callback := c.onConnectCallback()
+	if err == nil && callback != nil {
+		callback()
 	}
 
 	if err != nil {

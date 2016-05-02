@@ -64,6 +64,8 @@ func (fh *FakeHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fh.RLock()
+	defer fh.RUnlock()
 	handler := fh.GenerateHandler(fh.InputChan)
 	handler.ServeHTTP(rw, r)
 }
