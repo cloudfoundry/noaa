@@ -369,11 +369,6 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 			}
 		}, 20)
 
-		It("resets the closed flag to false after it is no longer needed", func() {
-			cnsmr.Close()
-			Eventually(cnsmr.Closed).Should(BeFalse())
-		})
-
 		Context("with multiple connections", func() {
 			var (
 				moreLogMessages <-chan *events.LogMessage
@@ -390,7 +385,6 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 				Eventually(errors).Should(BeClosed())
 				Eventually(moreLogMessages).Should(BeClosed())
 				Eventually(moreErrors).Should(BeClosed())
-				Eventually(cnsmr.Closed).Should(BeFalse())
 			})
 		})
 

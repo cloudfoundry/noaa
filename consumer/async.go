@@ -114,12 +114,6 @@ func (c *Consumer) Close() error {
 	return nil
 }
 
-// Closed is a legacy method that now returns false.  Consumers cannot be closed;
-// they will always be able to make more requests to the TrafficController.
-func (c *Consumer) Closed() bool {
-	return false
-}
-
 func (c *Consumer) SetIdleTimeout(idleTimeout time.Duration) {
 	c.idleTimeout = idleTimeout
 }
