@@ -10,9 +10,11 @@ NOAA is a client library to consume metric and log messages from Doppler.
 
 This library does not work with Go 1.3 through 1.3.3, due to a bug in the standard libraries.
 
+We support the two most recent stable versions of Golang.
+
 ###Deprecation
 The consumer of the `noaa` package has been deprecated in favor of the consumer in the `consumer` package.
-So when creating a new NOAA consumer, use `consumer.New()` instead of `noaa.NewConsumer()`.
+When creating a new NOAA consumer, use `consumer.New()` instead of `noaa.NewConsumer()`.
 See the samples for more details.
 
 ##Get the Code
