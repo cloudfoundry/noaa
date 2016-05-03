@@ -369,6 +369,12 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 			}
 		}, 20)
 
+		It("resets the closed flag to false after it is no longer needed", func() {
+			cnsmr.Close()
+			Eventually(cnsmr.Closed).Should(BeTrue())
+			Eventually(cnsmr.Closed).Should(BeFalse())
+		})
+
 		Context("with a failing handler", func() {
 			BeforeEach(func() {
 				fakeHandler.Fail = true
