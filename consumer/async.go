@@ -182,7 +182,7 @@ func (c *Consumer) firehose(subID, authToken string, retries uint) (<-chan *even
 }
 
 func (c *Consumer) listenForMessages(conn *connection, callback func(*events.Envelope)) error {
-	if conn.Closed() {
+	if conn.closed() {
 		return nil
 	}
 	ws := conn.websocket()
@@ -194,7 +194,7 @@ func (c *Consumer) listenForMessages(conn *connection, callback func(*events.Env
 
 		// If the connection was closed (i.e. if conn.Close() was called), we
 		// will have a non-nil error, but we want to return a nil error.
-		if conn.Closed() {
+		if conn.closed() {
 			return nil
 		}
 
@@ -214,7 +214,7 @@ func (c *Consumer) listenForMessages(conn *connection, callback func(*events.Env
 
 func (c *Consumer) listenAction(conn *connection, streamPath, authToken string, callback func(*events.Envelope)) func() (err error, done bool) {
 	return func() (error, bool) {
-		if conn.Closed() {
+		if conn.closed() {
 			return nil, true
 		}
 		ws, err := c.establishWebsocketConnection(streamPath, authToken)
@@ -347,9 +347,9 @@ func headersString(header http.Header) string {
 }
 
 type connection struct {
-	ws     *websocket.Conn
-	closed bool
-	lock   sync.Mutex
+	ws       *websocket.Conn
+	isClosed bool
+	lock     sync.Mutex
 }
 
 func (c *connection) websocket() *websocket.Conn {
@@ -361,7 +361,7 @@ func (c *connection) websocket() *websocket.Conn {
 func (c *connection) setWebsocket(ws *websocket.Conn) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	if c.closed {
+	if c.isClosed {
 		return
 	}
 	c.ws = ws
@@ -370,7 +370,7 @@ func (c *connection) setWebsocket(ws *websocket.Conn) {
 func (c *connection) close() error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	c.closed = true
+	c.isClosed = true
 	if c.ws == nil {
 		return nil
 	}
@@ -381,8 +381,8 @@ func (c *connection) close() error {
 	return c.ws.Close()
 }
 
-func (c *connection) Closed() bool {
+func (c *connection) closed() bool {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	return c.closed
+	return c.isClosed
 }
