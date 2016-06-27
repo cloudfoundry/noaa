@@ -258,7 +258,21 @@ func (c *Consumer) newConn() *connection {
 }
 
 func (c *Consumer) establishWebsocketConnection(path string, authToken string) (*websocket.Conn, error) {
-	header := http.Header{"Origin": []string{"http://localhost"}, "Authorization": []string{authToken}}
+	var err error
+	token := authToken
+
+	if authToken == "" && !c.refreshTokens {
+		return nil, errors.New("no token refresher has been set")
+	}
+
+	if token == "" {
+		token, err = c.getToken()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	header := http.Header{"Origin": []string{"http://localhost"}, "Authorization": []string{token}}
 	url := c.trafficControllerUrl + path
 
 	c.debugPrinter.Print("WEBSOCKET REQUEST:",

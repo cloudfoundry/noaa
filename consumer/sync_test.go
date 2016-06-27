@@ -37,8 +37,8 @@ var _ = Describe("Consumer (Synchronous)", func() {
 		fakeHandler = nil
 		tlsSettings = nil
 
-		appGuid = ""
-		authToken = ""
+		appGuid = "appGuid"
+		authToken = "authToken"
 		messagesToSend = make(chan []byte, 256)
 	})
 

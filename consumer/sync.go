@@ -56,6 +56,20 @@ func (c *Consumer) ContainerMetrics(appGuid string, authToken string) ([]*events
 }
 
 func (c *Consumer) readTC(appGuid string, authToken string, endpoint string, callback func(*events.Envelope) error) error {
+	var err error
+	token := authToken
+
+	if authToken == "" && !c.refreshTokens {
+		return errors.New("no token refresher has been set")
+	}
+
+	if token == "" {
+		token, err = c.getToken()
+		if err != nil {
+			return err
+		}
+	}
+
 	trafficControllerUrl, err := url.ParseRequestURI(c.trafficControllerUrl)
 	if err != nil {
 		return err
@@ -69,7 +83,7 @@ func (c *Consumer) readTC(appGuid string, authToken string, endpoint string, cal
 	recentPath := fmt.Sprintf("%s://%s/apps/%s/%s", scheme, trafficControllerUrl.Host, appGuid, endpoint)
 
 	req, _ := http.NewRequest("GET", recentPath, nil)
-	req.Header.Set("Authorization", authToken)
+	req.Header.Set("Authorization", token)
 
 	resp, err := c.client.Do(req)
 	if err != nil {

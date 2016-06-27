@@ -53,6 +53,10 @@ type Consumer struct {
 
 	conns     []*connection
 	connsLock sync.Mutex
+
+	refreshTokens  bool
+	refresherMutex sync.RWMutex
+	tokenRefresher TokenRefresher
 }
 
 // New creates a new consumer to a traffic controller.
