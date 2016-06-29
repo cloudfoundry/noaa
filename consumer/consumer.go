@@ -3,6 +3,7 @@ package consumer
 import (
 	"crypto/tls"
 	"errors"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -12,6 +13,7 @@ import (
 	"github.com/cloudfoundry/noaa/consumer/internal"
 
 	"github.com/cloudfoundry/noaa"
+	noaa_errors "github.com/cloudfoundry/noaa/errors"
 	"github.com/gorilla/websocket"
 )
 
@@ -70,4 +72,34 @@ func New(trafficControllerUrl string, tlsConfig *tls.Config, proxy func(*http.Re
 	}
 	consumer.dialer = websocket.Dialer{HandshakeTimeout: internal.HandshakeTimeout, NetDial: consumer.proxyDial, TLSClientConfig: tlsConfig}
 	return consumer
+}
+
+type httpError struct {
+	statusCode int
+	error      error
+}
+
+func checkForErrors(resp *http.Response) *httpError {
+	if resp.StatusCode == http.StatusUnauthorized {
+		data, _ := ioutil.ReadAll(resp.Body)
+		return &httpError{
+			statusCode: resp.StatusCode,
+			error:      noaa_errors.NewUnauthorizedError(string(data)),
+		}
+	}
+
+	if resp.StatusCode == http.StatusBadRequest {
+		return &httpError{
+			statusCode: resp.StatusCode,
+			error:      ErrBadRequest,
+		}
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return &httpError{
+			statusCode: resp.StatusCode,
+			error:      ErrNotOK,
+		}
+	}
+	return nil
 }

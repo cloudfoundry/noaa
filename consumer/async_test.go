@@ -37,7 +37,7 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 		tlsSettings = nil
 
 		appGuid = ""
-		authToken = "some-example-token"
+		authToken = ""
 		messagesToSend = make(chan []byte, 256)
 	})
 

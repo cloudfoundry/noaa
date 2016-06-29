@@ -2,107 +2,166 @@ package consumer_test
 
 import (
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"time"
 
+	"github.com/cloudfoundry/loggregatorlib/loggertesthelper"
+	"github.com/cloudfoundry/loggregatorlib/server/handlers"
 	"github.com/cloudfoundry/noaa/consumer"
 
+	. "github.com/apoydence/eachers"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Consumer fetching tokens from UAA", func() {
-	It("uses the token refresher to obtain a token before making async requests", func() {
-		refresher := newMockTokenRefresher()
-		c := consumer.New("fakeTrafficControllerURL", nil, nil)
+var _ = Describe("RefreshTokenFrom", func() {
+	Context("Asynchronous", func() {
+		var (
+			cnsmr       *consumer.Consumer
+			testHandler *errorRespondingHandler
+			tcURL       string
+			refresher   *mockTokenRefresher
+		)
 
-		c.RefreshTokenFrom(refresher)
+		BeforeEach(func() {
+			testHandler = &errorRespondingHandler{
+				subHandler:       handlers.NewWebsocketHandler(make(chan []byte), 100*time.Millisecond, loggertesthelper.Logger()),
+				responseStatuses: make(chan int, 10),
+			}
+			server := httptest.NewServer(testHandler)
+			tcURL = "ws://" + server.Listener.Addr().String()
 
-		var called bool
-		c.TailingLogs("some-fake-app-guid", "")
-		Eventually(refresher.RefreshAuthTokenCalled).Should(Receive(&called))
-		Expect(called).To(BeTrue())
+			refresher = newMockTokenRefresher()
+			cnsmr = consumer.New(tcURL, nil, nil)
 
-		called = false
-		c.TailingLogsWithoutReconnect("some-fake-app-guid", "")
-		Eventually(refresher.RefreshAuthTokenCalled).Should(Receive(&called))
-		Expect(called).To(BeTrue())
+			cnsmr.RefreshTokenFrom(refresher)
 
-		called = false
-		c.StreamWithoutReconnect("some-fake-app-guid", "")
-		Eventually(refresher.RefreshAuthTokenCalled).Should(Receive(&called))
-		Expect(called).To(BeTrue())
+			testHandler.responseStatuses <- http.StatusUnauthorized
+		})
 
-		called = false
-		c.Stream("some-fake-app-guid", "")
-		Eventually(refresher.RefreshAuthTokenCalled).Should(Receive(&called))
-		Expect(called).To(BeTrue())
+		Describe("TailingLogs", func() {
+			It("refreshes the token", func() {
+				cnsmr.TailingLogs("some-fake-app-guid", "")
+				Eventually(refresher.RefreshAuthTokenCalled).Should(BeCalled())
+			})
 
-		called = false
-		c.FirehoseWithoutReconnect("some-fake-app-guid", "")
-		Eventually(refresher.RefreshAuthTokenCalled).Should(Receive(&called))
-		Expect(called).To(BeTrue())
+			It("returns any error when fetching the token from the refresher", func() {
+				errMsg := "Fetching authToken failed"
+				refresher.RefreshAuthTokenOutput.Token <- ""
+				refresher.RefreshAuthTokenOutput.AuthError <- errors.New(errMsg)
 
-		called = false
-		c.Firehose("some-fake-app-guid", "")
-		Eventually(refresher.RefreshAuthTokenCalled).Should(Receive(&called))
-		Expect(called).To(BeTrue())
+				_, errChan := cnsmr.TailingLogs("some-fake-app-guid", "")
+				Eventually(errChan).Should(Receive(MatchError(errMsg)))
+			})
+		})
+
+		Describe("TailingLogsWithoutReconnect", func() {
+			It("refreshes the token", func() {
+				cnsmr.TailingLogsWithoutReconnect("some-fake-app-guid", "")
+				Eventually(refresher.RefreshAuthTokenCalled).Should(BeCalled())
+			})
+		})
+
+		Describe("StreamWithoutReconnect", func() {
+			It("refreshes the token", func() {
+				cnsmr.StreamWithoutReconnect("some-fake-app-guid", "")
+				Eventually(refresher.RefreshAuthTokenCalled).Should(BeCalled())
+			})
+		})
+
+		Describe("Stream", func() {
+			It("refreshes the token", func() {
+				cnsmr.Stream("some-fake-app-guid", "")
+				Eventually(refresher.RefreshAuthTokenCalled).Should(BeCalled())
+			})
+		})
+
+		Describe("FirehoseWithoutReconnect", func() {
+			It("refreshes the token", func() {
+				cnsmr.FirehoseWithoutReconnect("some-fake-app-guid", "")
+				Eventually(refresher.RefreshAuthTokenCalled).Should(BeCalled())
+			})
+		})
+
+		Describe("Firehose", func() {
+			It("refreshes the token", func() {
+				cnsmr.Firehose("some-fake-app-guid", "")
+				Eventually(refresher.RefreshAuthTokenCalled).Should(BeCalled())
+			})
+		})
 	})
 
-	It("uses the token refresher to obtain a token before making sync requests", func() {
-		refresher := newMockTokenRefresher()
-		refresher.RefreshAuthTokenOutput.Token <- "some-example-token"
-		refresher.RefreshAuthTokenOutput.AuthError <- nil
+	Context("Synchronous", func() {
+		var (
+			cnsmr       *consumer.Consumer
+			statuses    chan int
+			testHandler http.Handler
+			tcURL       string
+			refresher   *mockTokenRefresher
+		)
 
-		c := consumer.New("fakeTrafficControllerURL", nil, nil)
+		BeforeEach(func() {
+			statuses = make(chan int, 10)
+			testHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				select {
+				case status := <-statuses:
+					w.WriteHeader(status)
+				default:
+					w.WriteHeader(http.StatusOK)
+				}
+			})
+			server := httptest.NewServer(testHandler)
+			tcURL = "ws://" + server.Listener.Addr().String()
 
-		c.RefreshTokenFrom(refresher)
+			refresher = newMockTokenRefresher()
+			refresher.RefreshAuthTokenOutput.Token <- "some-example-token"
+			refresher.RefreshAuthTokenOutput.AuthError <- nil
 
-		var called bool
-		c.RecentLogs("some-fake-app-guid", "")
+			cnsmr = consumer.New(tcURL, nil, nil)
 
-		Eventually(refresher.RefreshAuthTokenCalled).Should(Receive(&called))
-		Expect(called).To(BeTrue())
+			cnsmr.RefreshTokenFrom(refresher)
 
-		called = false
-		refresher.RefreshAuthTokenOutput.Token <- "some-example-token"
-		refresher.RefreshAuthTokenOutput.AuthError <- nil
-		c.ContainerMetrics("some-fake-app-guid", "")
-		Eventually(refresher.RefreshAuthTokenCalled).Should(Receive(&called))
-		Expect(called).To(BeTrue())
+			statuses <- http.StatusUnauthorized
+		})
+
+		Describe("RecentLogs", func() {
+			It("uses the token refresher to obtain a new token", func() {
+				cnsmr.RecentLogs("some-fake-app-guid", "")
+				Eventually(refresher.RefreshAuthTokenCalled).Should(BeCalled())
+			})
+		})
+
+		Describe("ContainerMetrics", func() {
+			It("uses the token refresher to obtain a new token", func() {
+				cnsmr.ContainerMetrics("some-fake-app-guid", "")
+				Eventually(refresher.RefreshAuthTokenCalled).Should(BeCalled())
+			})
+		})
 	})
 
-	It("does not use the token refresher if an auth token has been passed in", func() {
+	It("does not use the token refresher if an auth token is valid", func() {
 		refresher := newMockTokenRefresher()
 
-		c := consumer.New("fakeTrafficControllerURL", nil, nil)
+		cnsmr := consumer.New("fakeTrafficControllerURL", nil, nil)
 
-		c.RefreshTokenFrom(refresher)
+		cnsmr.RefreshTokenFrom(refresher)
 
-		c.TailingLogs("some-fake-app-guid", "someToken")
-		Consistently(refresher.RefreshAuthTokenCalled).ShouldNot(Receive())
-	})
-
-	It("returns any error when fetching the token from the refresher", func() {
-		errMsg := "Fetching authToken failed"
-		refresher := newMockTokenRefresher()
-		refresher.RefreshAuthTokenOutput.Token <- ""
-		refresher.RefreshAuthTokenOutput.AuthError <- errors.New(errMsg)
-
-		c := consumer.New("fakeTrafficControllerURL", nil, nil)
-
-		c.RefreshTokenFrom(refresher)
-
-		var err error
-		_, errChan := c.TailingLogs("some-fake-app-guid", "")
-		Eventually(errChan).Should(Receive(&err))
-		Expect(err).To(MatchError(errMsg))
-	})
-
-	It("returns a helpful error message if the token refresher has not been set", func() {
-		c := consumer.New("fakeTrafficControllerURL", nil, nil)
-
-		var err error
-		_, errChan := c.TailingLogs("some-fake-app-guid", "")
-		Eventually(errChan).Should(Receive(&err))
-		Expect(err).To(MatchError("no token refresher has been set"))
+		cnsmr.TailingLogs("some-fake-app-guid", "someToken")
+		Consistently(refresher.RefreshAuthTokenCalled).ShouldNot(BeCalled())
 	})
 })
+
+type errorRespondingHandler struct {
+	subHandler       http.Handler
+	responseStatuses chan int
+}
+
+func (h *errorRespondingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	select {
+	case status := <-h.responseStatuses:
+		w.WriteHeader(status)
+	default:
+		h.subHandler.ServeHTTP(w, r)
+	}
+}

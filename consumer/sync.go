@@ -4,14 +4,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"net/url"
 	"strings"
 
 	"github.com/cloudfoundry/noaa"
-	noaa_errors "github.com/cloudfoundry/noaa/errors"
 	"github.com/cloudfoundry/sonde-go/events"
 	"github.com/gogo/protobuf/proto"
 )
@@ -56,20 +54,6 @@ func (c *Consumer) ContainerMetrics(appGuid string, authToken string) ([]*events
 }
 
 func (c *Consumer) readTC(appGuid string, authToken string, endpoint string, callback func(*events.Envelope) error) error {
-	var err error
-	token := authToken
-
-	if authToken == "" && !c.refreshTokens {
-		return errors.New("no token refresher has been set")
-	}
-
-	if token == "" {
-		token, err = c.getToken()
-		if err != nil {
-			return err
-		}
-	}
-
 	trafficControllerUrl, err := url.ParseRequestURI(c.trafficControllerUrl)
 	if err != nil {
 		return err
@@ -82,21 +66,20 @@ func (c *Consumer) readTC(appGuid string, authToken string, endpoint string, cal
 
 	recentPath := fmt.Sprintf("%s://%s/apps/%s/%s", scheme, trafficControllerUrl.Host, appGuid, endpoint)
 
-	req, _ := http.NewRequest("GET", recentPath, nil)
-	req.Header.Set("Authorization", token)
-
-	resp, err := c.client.Do(req)
-	if err != nil {
-		message := `Error dialing traffic controller server: %s.
-Please ask your Cloud Foundry Operator to check the platform configuration (traffic controller endpoint is %s).`
-		return errors.New(fmt.Sprintf(message, err, c.trafficControllerUrl))
+	resp, httpErr := c.tryTCConnection(recentPath, authToken)
+	if httpErr != nil && httpErr.statusCode == http.StatusUnauthorized && c.refreshTokens {
+		authToken, err = c.getToken()
+		if httpErr != nil {
+			return err
+		}
+		resp, httpErr = c.tryTCConnection(recentPath, authToken)
 	}
+
+	if httpErr != nil {
+		return httpErr.error
+	}
+
 	defer resp.Body.Close()
-
-	err = checkForErrors(resp)
-	if err != nil {
-		return err
-	}
 
 	reader, err := getMultipartReader(resp)
 	if err != nil {
@@ -125,20 +108,21 @@ Please ask your Cloud Foundry Operator to check the platform configuration (traf
 	return nil
 }
 
-func checkForErrors(resp *http.Response) error {
-	if resp.StatusCode == http.StatusUnauthorized {
-		data, _ := ioutil.ReadAll(resp.Body)
-		return noaa_errors.NewUnauthorizedError(string(data))
+func (c *Consumer) tryTCConnection(recentPath, token string) (*http.Response, *httpError) {
+	req, _ := http.NewRequest("GET", recentPath, nil)
+	req.Header.Set("Authorization", token)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		message := `Error dialing traffic controller server: %s.
+Please ask your Cloud Foundry Operator to check the platform configuration (traffic controller endpoint is %s).`
+		return nil, &httpError{
+			statusCode: -1,
+			error:      errors.New(fmt.Sprintf(message, err, c.trafficControllerUrl)),
+		}
 	}
 
-	if resp.StatusCode == http.StatusBadRequest {
-		return ErrBadRequest
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return ErrNotOK
-	}
-	return nil
+	return resp, checkForErrors(resp)
 }
 
 func getMultipartReader(resp *http.Response) (*multipart.Reader, error) {

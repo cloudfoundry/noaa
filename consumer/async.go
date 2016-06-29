@@ -258,20 +258,29 @@ func (c *Consumer) newConn() *connection {
 }
 
 func (c *Consumer) establishWebsocketConnection(path string, authToken string) (*websocket.Conn, error) {
-	var err error
-	token := authToken
-
-	if authToken == "" && !c.refreshTokens {
-		return nil, errors.New("no token refresher has been set")
-	}
-
-	if token == "" {
-		token, err = c.getToken()
+	ws, httpErr := c.tryWebsocketConnection(path, authToken)
+	if httpErr != nil && httpErr.statusCode == http.StatusUnauthorized && c.refreshTokens {
+		var err error
+		authToken, err = c.getToken()
 		if err != nil {
 			return nil, err
 		}
+		ws, httpErr = c.tryWebsocketConnection(path, authToken)
 	}
 
+	if httpErr != nil {
+		return nil, errors.New(fmt.Sprintf("Error dialing traffic controller server: %s.\nPlease ask your Cloud Foundry Operator to check the platform configuration (traffic controller is %s).", httpErr.error.Error(), c.trafficControllerUrl))
+	}
+
+	callback := c.onConnectCallback()
+	if httpErr == nil && callback != nil {
+		callback()
+	}
+
+	return ws, nil
+}
+
+func (c *Consumer) tryWebsocketConnection(path, token string) (*websocket.Conn, *httpError) {
 	header := http.Header{"Origin": []string{"http://localhost"}, "Authorization": []string{token}}
 	url := c.trafficControllerUrl + path
 
@@ -288,22 +297,19 @@ func (c *Consumer) establishWebsocketConnection(path string, authToken string) (
 				headersString(resp.Header))
 	}
 
-	if resp != nil && resp.StatusCode == http.StatusUnauthorized {
-		bodyData, _ := ioutil.ReadAll(resp.Body)
-		err = noaa_errors.NewUnauthorizedError(string(bodyData))
-		return ws, err
+	httpErr := &httpError{}
+	if resp != nil {
+		if resp.StatusCode == http.StatusUnauthorized {
+			bodyData, _ := ioutil.ReadAll(resp.Body)
+			err = noaa_errors.NewUnauthorizedError(string(bodyData))
+		}
+		httpErr.statusCode = resp.StatusCode
 	}
-
-	callback := c.onConnectCallback()
-	if err == nil && callback != nil {
-		callback()
-	}
-
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("Error dialing traffic controller server: %s.\nPlease ask your Cloud Foundry Operator to check the platform configuration (traffic controller is %s).", err.Error(), c.trafficControllerUrl))
+		httpErr.error = err
+		return nil, httpErr
 	}
-
-	return ws, err
+	return ws, nil
 }
 
 func (c *Consumer) proxyDial(network, addr string) (net.Conn, error) {
