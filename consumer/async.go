@@ -257,23 +257,42 @@ func (c *Consumer) newConn() *connection {
 	return conn
 }
 
-func (c *Consumer) establishWebsocketConnection(path string, authToken string) (*websocket.Conn, error) {
-	ws, httpErr := c.tryWebsocketConnection(path, authToken)
-	if httpErr != nil && httpErr.statusCode == http.StatusUnauthorized && c.refreshTokens {
-		var err error
-		authToken, err = c.getToken()
-		if err != nil {
-			return nil, err
-		}
-		ws, httpErr = c.tryWebsocketConnection(path, authToken)
+func (c *Consumer) websocketConn(path, authToken string) (*websocket.Conn, error) {
+	if authToken == "" && c.refreshTokens {
+		return c.websocketConnNewToken(path)
 	}
 
+	var err error
+	ws, httpErr := c.tryWebsocketConnection(path, authToken)
 	if httpErr != nil {
-		return nil, errors.New(fmt.Sprintf("Error dialing traffic controller server: %s.\nPlease ask your Cloud Foundry Operator to check the platform configuration (traffic controller is %s).", httpErr.error.Error(), c.trafficControllerUrl))
+		err = httpErr.error
+		if httpErr.statusCode == http.StatusUnauthorized && c.refreshTokens {
+			ws, err = c.websocketConnNewToken(path)
+		}
+	}
+	return ws, err
+}
+
+func (c *Consumer) websocketConnNewToken(path string) (*websocket.Conn, error) {
+	token, err := c.getToken()
+	if err != nil {
+		return nil, err
+	}
+	ws, httpErr := c.tryWebsocketConnection(path, token)
+	if httpErr != nil {
+		return nil, httpErr.error
+	}
+	return ws, nil
+}
+
+func (c *Consumer) establishWebsocketConnection(path, authToken string) (*websocket.Conn, error) {
+	ws, err := c.websocketConn(path, authToken)
+	if err != nil {
+		return nil, err
 	}
 
 	callback := c.onConnectCallback()
-	if httpErr == nil && callback != nil {
+	if err == nil && callback != nil {
 		callback()
 	}
 
@@ -306,7 +325,9 @@ func (c *Consumer) tryWebsocketConnection(path, token string) (*websocket.Conn, 
 		httpErr.statusCode = resp.StatusCode
 	}
 	if err != nil {
-		httpErr.error = err
+		errMsg := "Error dialing traffic controller server: %s.\n" +
+			"Please ask your Cloud Foundry Operator to check the platform configuration (traffic controller is %s)."
+		httpErr.error = errors.New(fmt.Sprintf(errMsg, err.Error(), c.trafficControllerUrl))
 		return nil, httpErr
 	}
 	return ws, nil

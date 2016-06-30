@@ -36,12 +36,16 @@ var _ = Describe("RefreshTokenFrom", func() {
 			cnsmr = consumer.New(tcURL, nil, nil)
 
 			cnsmr.RefreshTokenFrom(refresher)
-
-			testHandler.responseStatuses <- http.StatusUnauthorized
 		})
 
 		Describe("TailingLogs", func() {
-			It("refreshes the token", func() {
+			It("loads a token if the provided token is empty", func() {
+				cnsmr.TailingLogs("some-fake-app-guid", "")
+				Eventually(refresher.RefreshAuthTokenCalled).Should(BeCalled())
+			})
+
+			It("loads a token if the provided token fails with 401", func() {
+				testHandler.responseStatuses <- http.StatusUnauthorized
 				cnsmr.TailingLogs("some-fake-app-guid", "")
 				Eventually(refresher.RefreshAuthTokenCalled).Should(BeCalled())
 			})
@@ -57,35 +61,65 @@ var _ = Describe("RefreshTokenFrom", func() {
 		})
 
 		Describe("TailingLogsWithoutReconnect", func() {
-			It("refreshes the token", func() {
+			It("loads a token if the provided token is empty", func() {
+				cnsmr.TailingLogsWithoutReconnect("some-fake-app-guid", "")
+				Eventually(refresher.RefreshAuthTokenCalled).Should(BeCalled())
+			})
+
+			It("loads a token if the provided token fails with 401", func() {
+				testHandler.responseStatuses <- http.StatusUnauthorized
 				cnsmr.TailingLogsWithoutReconnect("some-fake-app-guid", "")
 				Eventually(refresher.RefreshAuthTokenCalled).Should(BeCalled())
 			})
 		})
 
 		Describe("StreamWithoutReconnect", func() {
-			It("refreshes the token", func() {
+			It("loads a token if the provided token is empty", func() {
+				cnsmr.StreamWithoutReconnect("some-fake-app-guid", "")
+				Eventually(refresher.RefreshAuthTokenCalled).Should(BeCalled())
+			})
+
+			It("loads a token if the provided token fails with 401", func() {
+				testHandler.responseStatuses <- http.StatusUnauthorized
 				cnsmr.StreamWithoutReconnect("some-fake-app-guid", "")
 				Eventually(refresher.RefreshAuthTokenCalled).Should(BeCalled())
 			})
 		})
 
 		Describe("Stream", func() {
-			It("refreshes the token", func() {
+			It("loads a token if the provided token is empty", func() {
+				cnsmr.Stream("some-fake-app-guid", "")
+				Eventually(refresher.RefreshAuthTokenCalled).Should(BeCalled())
+			})
+
+			It("loads a token if the provided token fails with 401", func() {
+				testHandler.responseStatuses <- http.StatusUnauthorized
 				cnsmr.Stream("some-fake-app-guid", "")
 				Eventually(refresher.RefreshAuthTokenCalled).Should(BeCalled())
 			})
 		})
 
 		Describe("FirehoseWithoutReconnect", func() {
-			It("refreshes the token", func() {
+			It("loads a token if the provided token is empty", func() {
+				cnsmr.FirehoseWithoutReconnect("some-fake-app-guid", "")
+				Eventually(refresher.RefreshAuthTokenCalled).Should(BeCalled())
+			})
+
+			It("loads a token if the provided token fails with 401", func() {
+				testHandler.responseStatuses <- http.StatusUnauthorized
 				cnsmr.FirehoseWithoutReconnect("some-fake-app-guid", "")
 				Eventually(refresher.RefreshAuthTokenCalled).Should(BeCalled())
 			})
 		})
 
 		Describe("Firehose", func() {
-			It("refreshes the token", func() {
+			It("loads a token if the provided token is empty", func() {
+				cnsmr.Firehose("some-fake-app-guid", "")
+				Eventually(refresher.RefreshAuthTokenCalled).Should(BeCalled())
+			})
+
+			It("loads a token if the provided token fails with 401", func() {
+				testHandler.responseStatuses <- http.StatusUnauthorized
 				cnsmr.Firehose("some-fake-app-guid", "")
 				Eventually(refresher.RefreshAuthTokenCalled).Should(BeCalled())
 			})
@@ -121,8 +155,6 @@ var _ = Describe("RefreshTokenFrom", func() {
 			cnsmr = consumer.New(tcURL, nil, nil)
 
 			cnsmr.RefreshTokenFrom(refresher)
-
-			statuses <- http.StatusUnauthorized
 		})
 
 		Describe("RecentLogs", func() {
@@ -130,10 +162,22 @@ var _ = Describe("RefreshTokenFrom", func() {
 				cnsmr.RecentLogs("some-fake-app-guid", "")
 				Eventually(refresher.RefreshAuthTokenCalled).Should(BeCalled())
 			})
+
+			It("loads a token if the provided token fails with 401", func() {
+				statuses <- http.StatusUnauthorized
+				cnsmr.RecentLogs("some-fake-app-guid", "")
+				Eventually(refresher.RefreshAuthTokenCalled).Should(BeCalled())
+			})
 		})
 
 		Describe("ContainerMetrics", func() {
 			It("uses the token refresher to obtain a new token", func() {
+				cnsmr.ContainerMetrics("some-fake-app-guid", "")
+				Eventually(refresher.RefreshAuthTokenCalled).Should(BeCalled())
+			})
+
+			It("loads a token if the provided token fails with 401", func() {
+				statuses <- http.StatusUnauthorized
 				cnsmr.ContainerMetrics("some-fake-app-guid", "")
 				Eventually(refresher.RefreshAuthTokenCalled).Should(BeCalled())
 			})

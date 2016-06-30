@@ -66,19 +66,10 @@ func (c *Consumer) readTC(appGuid string, authToken string, endpoint string, cal
 
 	recentPath := fmt.Sprintf("%s://%s/apps/%s/%s", scheme, trafficControllerUrl.Host, appGuid, endpoint)
 
-	resp, httpErr := c.tryTCConnection(recentPath, authToken)
-	if httpErr != nil && httpErr.statusCode == http.StatusUnauthorized && c.refreshTokens {
-		authToken, err = c.getToken()
-		if httpErr != nil {
-			return err
-		}
-		resp, httpErr = c.tryTCConnection(recentPath, authToken)
+	resp, err := c.requestTC(recentPath, authToken)
+	if err != nil {
+		return err
 	}
-
-	if httpErr != nil {
-		return httpErr.error
-	}
-
 	defer resp.Body.Close()
 
 	reader, err := getMultipartReader(resp)
@@ -106,6 +97,33 @@ func (c *Consumer) readTC(appGuid string, authToken string, endpoint string, cal
 	}
 
 	return nil
+}
+
+func (c *Consumer) requestTC(path, authToken string) (*http.Response, error) {
+	if authToken == "" && c.refreshTokens {
+		return c.requestTCNewToken(path)
+	}
+	var err error
+	resp, httpErr := c.tryTCConnection(path, authToken)
+	if httpErr != nil {
+		err = httpErr.error
+		if httpErr.statusCode == http.StatusUnauthorized && c.refreshTokens {
+			resp, err = c.requestTCNewToken(path)
+		}
+	}
+	return resp, err
+}
+
+func (c *Consumer) requestTCNewToken(path string) (*http.Response, error) {
+	token, err := c.getToken()
+	if err != nil {
+		return nil, err
+	}
+	conn, httpErr := c.tryTCConnection(path, token)
+	if httpErr != nil {
+		return nil, httpErr.error
+	}
+	return conn, nil
 }
 
 func (c *Consumer) tryTCConnection(recentPath, token string) (*http.Response, *httpError) {
