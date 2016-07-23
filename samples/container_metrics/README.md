@@ -3,11 +3,11 @@
 ## Overview
 
 We can use Dropsonde to send container metrics to metron which will emit them
-to Doppler; which is then polled by traffic controller. The endpoint on the
-traffic controller should report the latest container metric for each instance
+to Doppler; which is then polled by trafficcontroller. The endpoint on the
+trafficcontroller should report the latest container metric for each instance
 of the specified app.
 
-`samples/container_metrics/consumer/main.go` connects to the traffic controller
+`samples/container_metrics/consumer/main.go` connects to the trafficcontroller
 and polls the container metrics endpoint.
 
 `samples/container_metrics/emitter/main.go` is a sample app that emits container

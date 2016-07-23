@@ -134,7 +134,7 @@ var _ = Describe("Noaa behind a Proxy", func() {
 			var err error
 			Eventually(errorChan).Should(Receive(&err))
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("Error dialing traffic controller server"))
+			Expect(err.Error()).To(ContainSubstring("Error dialing trafficcontroller server"))
 		})
 
 		It("connects to a non-consumerProxyFunc server", func() {

@@ -68,7 +68,7 @@ var _ = Describe("Consumer connecting through a Proxy", func() {
 			close(messagesToSend)
 		})
 
-		Context("with a message in the traffic controller", func() {
+		Context("with a message in the trafficcontroller", func() {
 			BeforeEach(func() {
 				messagesToSend <- marshalMessage(createMessage("hello", 0))
 			})
@@ -118,7 +118,7 @@ var _ = Describe("Consumer connecting through a Proxy", func() {
 				var err error
 				Eventually(errs).Should(Receive(&err))
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("Error dialing traffic controller server"))
+				Expect(err.Error()).To(ContainSubstring("Error dialing trafficcontroller server"))
 			})
 		})
 
