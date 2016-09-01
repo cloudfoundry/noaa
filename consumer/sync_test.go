@@ -8,7 +8,6 @@ import (
 
 	"github.com/cloudfoundry/loggregatorlib/loggertesthelper"
 	"github.com/cloudfoundry/loggregatorlib/server/handlers"
-	"github.com/cloudfoundry/noaa"
 	"github.com/cloudfoundry/noaa/consumer"
 	"github.com/cloudfoundry/noaa/errors"
 	"github.com/cloudfoundry/noaa/test_helpers"
@@ -108,7 +107,7 @@ var _ = Describe("Consumer (Synchronous)", func() {
 
 			It("returns a bad reponse error message", func() {
 				Expect(recentError).To(HaveOccurred())
-				Expect(recentError).To(Equal(noaa.ErrBadResponse))
+				Expect(recentError).To(Equal(consumer.ErrBadResponse))
 			})
 		})
 
@@ -147,7 +146,7 @@ var _ = Describe("Consumer (Synchronous)", func() {
 
 			It("returns a bad reponse error message", func() {
 				Expect(recentError).To(HaveOccurred())
-				Expect(recentError).To(Equal(noaa.ErrBadResponse))
+				Expect(recentError).To(Equal(consumer.ErrBadResponse))
 			})
 
 		})
@@ -165,7 +164,7 @@ var _ = Describe("Consumer (Synchronous)", func() {
 
 			It("returns a bad reponse error message", func() {
 				Expect(recentError).To(HaveOccurred())
-				Expect(recentError).To(Equal(noaa.ErrBadResponse))
+				Expect(recentError).To(Equal(consumer.ErrBadResponse))
 			})
 
 		})
@@ -182,7 +181,7 @@ var _ = Describe("Consumer (Synchronous)", func() {
 
 			It("returns a not found reponse error message", func() {
 				Expect(recentError).To(HaveOccurred())
-				Expect(recentError).To(Equal(noaa.ErrNotFound))
+				Expect(recentError).To(Equal(consumer.ErrNotFound))
 			})
 
 		})
@@ -277,7 +276,7 @@ var _ = Describe("Consumer (Synchronous)", func() {
 
 			It("returns a bad reponse error message", func() {
 				Expect(recentError).To(HaveOccurred())
-				Expect(recentError).To(Equal(noaa.ErrBadResponse))
+				Expect(recentError).To(Equal(consumer.ErrBadResponse))
 			})
 		})
 
@@ -317,7 +316,7 @@ var _ = Describe("Consumer (Synchronous)", func() {
 			It("returns a bad reponse error message", func() {
 
 				Expect(recentError).To(HaveOccurred())
-				Expect(recentError).To(Equal(noaa.ErrBadResponse))
+				Expect(recentError).To(Equal(consumer.ErrBadResponse))
 			})
 
 		})
@@ -336,7 +335,7 @@ var _ = Describe("Consumer (Synchronous)", func() {
 
 			It("returns a bad reponse error message", func() {
 				Expect(recentError).To(HaveOccurred())
-				Expect(recentError).To(Equal(noaa.ErrBadResponse))
+				Expect(recentError).To(Equal(consumer.ErrBadResponse))
 			})
 
 		})
@@ -355,7 +354,7 @@ var _ = Describe("Consumer (Synchronous)", func() {
 			It("returns a not found reponse error message", func() {
 
 				Expect(recentError).To(HaveOccurred())
-				Expect(recentError).To(Equal(noaa.ErrNotFound))
+				Expect(recentError).To(Equal(consumer.ErrNotFound))
 			})
 
 		})
