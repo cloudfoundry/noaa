@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/tls"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -455,6 +456,15 @@ func (cnsmr *Consumer) proxyDial(network, addr string) (net.Conn, error) {
 		return net.Dial(network, addr)
 	}
 
+	connectHeader := make(http.Header)
+	if user := proxyUrl.User; user != nil {
+		proxyUser := user.Username()
+		if proxyPassword, passwordSet := user.Password(); passwordSet {
+			credential := base64.StdEncoding.EncodeToString([]byte(proxyUser + ":" + proxyPassword))
+			connectHeader.Set("Proxy-Authorization", "Basic "+credential)
+		}
+	}
+
 	proxyConn, err := net.Dial(network, proxyUrl.Host)
 	if err != nil {
 		return nil, err
@@ -464,7 +474,7 @@ func (cnsmr *Consumer) proxyDial(network, addr string) (net.Conn, error) {
 		Method: "CONNECT",
 		URL:    targetUrl,
 		Host:   targetUrl.Host,
-		Header: make(http.Header),
+		Header: connectHeader,
 	}
 	connectReq.Write(proxyConn)
 
