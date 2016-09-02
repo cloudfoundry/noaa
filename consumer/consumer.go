@@ -12,7 +12,6 @@ import (
 
 	"github.com/cloudfoundry/noaa/consumer/internal"
 
-	"github.com/cloudfoundry/noaa"
 	noaa_errors "github.com/cloudfoundry/noaa/errors"
 	"github.com/gorilla/websocket"
 )
@@ -41,6 +40,12 @@ type DebugPrinter interface {
 	Print(title, dump string)
 }
 
+type nullDebugPrinter struct {
+}
+
+func (nullDebugPrinter) Print(title, body string) {
+}
+
 // Consumer represents the actions that can be performed against trafficcontroller.
 // See sync.go and async.go for trafficcontroller access methods.
 type Consumer struct {
@@ -67,7 +72,7 @@ func New(trafficControllerUrl string, tlsConfig *tls.Config, proxy func(*http.Re
 	consumer := &Consumer{
 		trafficControllerUrl: trafficControllerUrl,
 		proxy:                proxy,
-		debugPrinter:         noaa.NullDebugPrinter{},
+		debugPrinter:         nullDebugPrinter{},
 		client: &http.Client{
 			Transport: transport,
 			Timeout:   internal.Timeout,

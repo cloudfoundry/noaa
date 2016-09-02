@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudfoundry/noaa"
 	noaa_errors "github.com/cloudfoundry/noaa/errors"
 	"github.com/cloudfoundry/sonde-go/events"
 	"github.com/gogo/protobuf/proto"
@@ -84,7 +83,7 @@ func (c *Consumer) FirehoseWithoutReconnect(subscriptionId string, authToken str
 
 // SetDebugPrinter sets the websocket connection to write debug information to
 // debugPrinter.
-func (c *Consumer) SetDebugPrinter(debugPrinter noaa.DebugPrinter) {
+func (c *Consumer) SetDebugPrinter(debugPrinter DebugPrinter) {
 	c.debugPrinter = debugPrinter
 }
 
