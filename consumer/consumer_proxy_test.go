@@ -14,6 +14,7 @@ import (
 	"github.com/cloudfoundry/noaa/consumer"
 	"github.com/cloudfoundry/sonde-go/events"
 	"github.com/elazarl/goproxy"
+	"github.com/elazarl/goproxy/ext/auth"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -77,6 +78,55 @@ var _ = Describe("Consumer connecting through a Proxy", func() {
 				message := <-incoming
 				Expect(message.GetLogMessage().GetMessage()).To(Equal([]byte("hello")))
 			})
+
+		})
+
+		Context("with an auth proxy server", func() {
+			BeforeEach(func() {
+				goProxyHandler.OnRequest().HandleConnect(auth.BasicConnect("my_realm", func(user, passwd string) bool {
+					return user == "user" && passwd == "password"
+				}))
+				proxy = func(*http.Request) (*url.URL, error) {
+					urlP, err := url.Parse(testProxyServer.URL)
+					urlP.User = url.UserPassword("user", "password")
+					if err != nil {
+						return nil, err
+					}
+
+					return urlP, nil
+				}
+				messagesToSend <- marshalMessage(createMessage("hello", 0))
+			})
+			It("connect sucessfully", func() {
+				message := <-incoming
+				Expect(message.GetLogMessage().GetMessage()).To(Equal([]byte("hello")))
+			})
+
+		})
+
+		Context("with an auth proxy server with bad credential", func() {
+			BeforeEach(func() {
+				goProxyHandler.OnRequest().HandleConnect(auth.BasicConnect("my_realm", func(user, passwd string) bool {
+					return user == "user" && passwd == "password"
+				}))
+				proxy = func(*http.Request) (*url.URL, error) {
+					urlP, err := url.Parse(testProxyServer.URL)
+					urlP.User = url.UserPassword("user", "passwrd")
+					if err != nil {
+						return nil, err
+					}
+
+					return urlP, nil
+				}
+
+			})
+			It("connect sucessfully", func() {
+				var err error
+				Eventually(errs).Should(Receive(&err))
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("Proxy Authentication Required"))
+			})
+
 		})
 
 		Context("with a closed proxy server", func() {
