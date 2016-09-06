@@ -78,7 +78,6 @@ var _ = Describe("Consumer connecting through a Proxy", func() {
 				message := <-incoming
 				Expect(message.GetLogMessage().GetMessage()).To(Equal([]byte("hello")))
 			})
-
 		})
 
 		Context("with an auth proxy server", func() {
@@ -87,21 +86,21 @@ var _ = Describe("Consumer connecting through a Proxy", func() {
 					return user == "user" && passwd == "password"
 				}))
 				proxy = func(*http.Request) (*url.URL, error) {
-					urlP, err := url.Parse(testProxyServer.URL)
-					urlP.User = url.UserPassword("user", "password")
+					proxyURL, err := url.Parse(testProxyServer.URL)
+					proxyURL.User = url.UserPassword("user", "password")
 					if err != nil {
 						return nil, err
 					}
 
-					return urlP, nil
+					return proxyURL, nil
 				}
 				messagesToSend <- marshalMessage(createMessage("hello", 0))
 			})
-			It("connect sucessfully", func() {
+
+			It("connects successfully", func() {
 				message := <-incoming
 				Expect(message.GetLogMessage().GetMessage()).To(Equal([]byte("hello")))
 			})
-
 		})
 
 		Context("with an auth proxy server with bad credential", func() {
@@ -110,23 +109,22 @@ var _ = Describe("Consumer connecting through a Proxy", func() {
 					return user == "user" && passwd == "password"
 				}))
 				proxy = func(*http.Request) (*url.URL, error) {
-					urlP, err := url.Parse(testProxyServer.URL)
-					urlP.User = url.UserPassword("user", "passwrd")
+					proxyURL, err := url.Parse(testProxyServer.URL)
+					proxyURL.User = url.UserPassword("user", "passwrd")
 					if err != nil {
 						return nil, err
 					}
 
-					return urlP, nil
+					return proxyURL, nil
 				}
-
 			})
-			It("connect sucessfully", func() {
+
+			It("connects successfully", func() {
 				var err error
 				Eventually(errs).Should(Receive(&err))
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("Proxy Authentication Required"))
 			})
-
 		})
 
 		Context("with a closed proxy server", func() {
