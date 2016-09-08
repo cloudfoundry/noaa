@@ -206,9 +206,35 @@ var _ = Describe("Consumer (Synchronous)", func() {
 	})
 
 	Describe("ContainerMetrics", func() {
+		var handler *handlers.HttpHandler
+
+		BeforeEach(func() {
+			handler = handlers.NewHttpHandler(messagesToSend, loggertesthelper.Logger())
+			testServer = httptest.NewServer(handler)
+			trafficControllerURL = "ws://" + testServer.Listener.Addr().String()
+		})
+
+		It("returns the ContainerMetric values from ContainerEnvelopes", func() {
+			env := createContainerMetric(2, 2000)
+			messagesToSend <- marshalMessage(env)
+			close(messagesToSend)
+			envelopes, _ := cnsmr.ContainerEnvelopes(appGuid, authToken)
+
+			messagesToSend = make(chan []byte, 100)
+			handler.Messages = messagesToSend
+			messagesToSend <- marshalMessage(env)
+			close(messagesToSend)
+			metrics, err := cnsmr.ContainerMetrics(appGuid, authToken)
+			Expect(metrics).To(HaveLen(1))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(metrics).To(ConsistOf(envelopes[0].ContainerMetric))
+		})
+	})
+
+	Describe("ContainerEnvelopes", func() {
 		var (
-			receivedContainerMetrics []*events.ContainerMetric
-			recentError              error
+			envelopes []*events.Envelope
+			err       error
 		)
 
 		BeforeEach(func() {
@@ -217,7 +243,7 @@ var _ = Describe("Consumer (Synchronous)", func() {
 
 		JustBeforeEach(func() {
 			close(messagesToSend)
-			receivedContainerMetrics, recentError = cnsmr.ContainerMetrics(appGuid, authToken)
+			envelopes, err = cnsmr.ContainerEnvelopes(appGuid, authToken)
 		})
 
 		Context("when the connection cannot be established", func() {
@@ -226,7 +252,7 @@ var _ = Describe("Consumer (Synchronous)", func() {
 			})
 
 			It("invalid urls return error", func() {
-				Expect(recentError).ToNot(BeNil())
+				Expect(err).ToNot(BeNil())
 			})
 		})
 
@@ -239,14 +265,12 @@ var _ = Describe("Consumer (Synchronous)", func() {
 			Context("with a successful connection", func() {
 				BeforeEach(func() {
 					messagesToSend <- marshalMessage(createContainerMetric(2, 2000))
-					messagesToSend <- marshalMessage(createContainerMetric(1, 1000))
 				})
 
-				It("returns messages from the server", func() {
-					Expect(recentError).NotTo(HaveOccurred())
-					Expect(receivedContainerMetrics).To(HaveLen(2))
-					Expect(receivedContainerMetrics[0].GetInstanceIndex()).To(Equal(int32(1)))
-					Expect(receivedContainerMetrics[1].GetInstanceIndex()).To(Equal(int32(2)))
+				It("returns envelopes from the server", func() {
+					Expect(err).NotTo(HaveOccurred())
+					Expect(envelopes).To(HaveLen(1))
+					Expect(envelopes[0].GetContainerMetric().GetInstanceIndex()).To(Equal(int32(2)))
 				})
 			})
 
@@ -257,8 +281,8 @@ var _ = Describe("Consumer (Synchronous)", func() {
 				})
 
 				It("returns the error", func() {
-					Expect(recentError).To(HaveOccurred())
-					Expect(recentError).To(MatchError("Upstream error: an error occurred"))
+					Expect(err).To(HaveOccurred())
+					Expect(err).To(MatchError("Upstream error: an error occurred"))
 				})
 			})
 		})
@@ -275,8 +299,8 @@ var _ = Describe("Consumer (Synchronous)", func() {
 			})
 
 			It("returns a bad reponse error message", func() {
-				Expect(recentError).To(HaveOccurred())
-				Expect(recentError).To(Equal(consumer.ErrBadResponse))
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(Equal(consumer.ErrBadResponse))
 			})
 		})
 
@@ -297,8 +321,8 @@ var _ = Describe("Consumer (Synchronous)", func() {
 			})
 
 			It("does not throw an error", func() {
-				Expect(recentError).NotTo(HaveOccurred())
-				Expect(receivedContainerMetrics).To(HaveLen(1))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(envelopes).To(HaveLen(1))
 			})
 		})
 
@@ -315,8 +339,8 @@ var _ = Describe("Consumer (Synchronous)", func() {
 
 			It("returns a bad reponse error message", func() {
 
-				Expect(recentError).To(HaveOccurred())
-				Expect(recentError).To(Equal(consumer.ErrBadResponse))
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(Equal(consumer.ErrBadResponse))
 			})
 
 		})
@@ -334,8 +358,8 @@ var _ = Describe("Consumer (Synchronous)", func() {
 			})
 
 			It("returns a bad reponse error message", func() {
-				Expect(recentError).To(HaveOccurred())
-				Expect(recentError).To(Equal(consumer.ErrBadResponse))
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(Equal(consumer.ErrBadResponse))
 			})
 
 		})
@@ -353,8 +377,8 @@ var _ = Describe("Consumer (Synchronous)", func() {
 
 			It("returns a not found reponse error message", func() {
 
-				Expect(recentError).To(HaveOccurred())
-				Expect(recentError).To(Equal(consumer.ErrNotFound))
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(Equal(consumer.ErrNotFound))
 			})
 
 		})
@@ -372,9 +396,9 @@ var _ = Describe("Consumer (Synchronous)", func() {
 
 			It("returns a helpful error message", func() {
 
-				Expect(recentError).To(HaveOccurred())
-				Expect(recentError.Error()).To(ContainSubstring("You are not authorized. Helpful message"))
-				Expect(recentError).To(BeAssignableToTypeOf(&errors.UnauthorizedError{}))
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("You are not authorized. Helpful message"))
+				Expect(err).To(BeAssignableToTypeOf(&errors.UnauthorizedError{}))
 			})
 		})
 	})
