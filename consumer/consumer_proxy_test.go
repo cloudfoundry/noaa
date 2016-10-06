@@ -41,8 +41,9 @@ var _ = Describe("Consumer connecting through a Proxy", func() {
 		goProxyHandler = goproxy.NewProxyHttpServer()
 		goProxyHandler.Logger = log.New(bytes.NewBufferString(""), "", 0)
 		testProxyServer = httptest.NewServer(goProxyHandler)
+		u, err := url.Parse(testProxyServer.URL)
 		proxy = func(*http.Request) (*url.URL, error) {
-			return url.Parse(testProxyServer.URL)
+			return u, err
 		}
 	})
 
@@ -85,8 +86,8 @@ var _ = Describe("Consumer connecting through a Proxy", func() {
 				goProxyHandler.OnRequest().HandleConnect(auth.BasicConnect("my_realm", func(user, passwd string) bool {
 					return user == "user" && passwd == "password"
 				}))
+				proxyURL, err := url.Parse(testProxyServer.URL)
 				proxy = func(*http.Request) (*url.URL, error) {
-					proxyURL, err := url.Parse(testProxyServer.URL)
 					proxyURL.User = url.UserPassword("user", "password")
 					if err != nil {
 						return nil, err
@@ -108,8 +109,8 @@ var _ = Describe("Consumer connecting through a Proxy", func() {
 				goProxyHandler.OnRequest().HandleConnect(auth.BasicConnect("my_realm", func(user, passwd string) bool {
 					return user == "user" && passwd == "password"
 				}))
+				proxyURL, err := url.Parse(testProxyServer.URL)
 				proxy = func(*http.Request) (*url.URL, error) {
-					proxyURL, err := url.Parse(testProxyServer.URL)
 					proxyURL.User = url.UserPassword("user", "passwrd")
 					if err != nil {
 						return nil, err

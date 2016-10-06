@@ -4,14 +4,17 @@ import (
 	"crypto/tls"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"time"
 
 	"github.com/cloudfoundry/loggregatorlib/loggertesthelper"
 	"github.com/cloudfoundry/loggregatorlib/server/handlers"
 	"github.com/cloudfoundry/noaa/consumer"
+	"github.com/cloudfoundry/noaa/errors"
 	"github.com/cloudfoundry/noaa/test_helpers"
 	"github.com/cloudfoundry/sonde-go/events"
 	"github.com/gogo/protobuf/proto"
+	"github.com/onsi/gomega/types"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -43,6 +46,8 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 
 	JustBeforeEach(func() {
 		cnsmr = consumer.New(trafficControllerURL, tlsSettings, nil)
+		cnsmr.SetMinRetryDelay(100 * time.Millisecond)
+		cnsmr.SetMaxRetryDelay(500 * time.Millisecond)
 	})
 
 	AfterEach(func() {
@@ -102,9 +107,10 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 				cb := func() { called = true }
 
 				cnsmr.SetOnConnectCallback(cb)
-				cnsmr.TailingLogsWithoutReconnect(appGuid, authToken)
+				_, errs := cnsmr.TailingLogsWithoutReconnect(appGuid, authToken)
 
 				Consistently(func() bool { return called }).Should(BeFalse())
+				Eventually(errs).Should(Receive(Not(BeRetryable())))
 			})
 
 		})
@@ -241,6 +247,7 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 
 						var err error
 						Eventually(errors).Should(Receive(&err))
+						Expect(err).ToNot(BeRetryable())
 						Expect(err.Error()).To(ContainSubstring("websocket: close 1000"))
 
 						close(done)
@@ -270,6 +277,7 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 				It("receives an error on errChan", func(done Done) {
 					var err error
 					Eventually(errors).Should(Receive(&err))
+					Expect(err).ToNot(BeRetryable())
 					Expect(err.Error()).To(ContainSubstring("Please ask your Cloud Foundry Operator"))
 
 					close(done)
@@ -288,6 +296,7 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 				It("it returns a helpful error message", func() {
 					var err error
 					Eventually(errors).Should(Receive(&err))
+					Expect(err).ToNot(BeRetryable())
 					Expect(err.Error()).To(ContainSubstring("You are not authorized. Helpful message"))
 				})
 			})
@@ -346,16 +355,14 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 			logMessages, errors = cnsmr.TailingLogs(appGuid, authToken)
 		})
 
-		It("resets the attempt counter after a successful connection", func(done Done) {
-			defer close(done)
-
+		It("resets the delay after a successful connection", func() {
 			fakeHandler.InputChan <- marshalMessage(createMessage("message 1", 0))
 			Eventually(logMessages).Should(Receive())
 
 			fakeHandler.Close()
 			expectedErrorCount := 4
 			for i := 0; i < expectedErrorCount; i++ {
-				Eventually(errors, time.Second).Should(Receive())
+				Eventually(errors, time.Second).Should(Receive(HaveOccurred()))
 			}
 			fakeHandler.Reset()
 
@@ -365,9 +372,9 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 
 			fakeHandler.Close()
 			for i := uint(0); i < retries; i++ {
-				Eventually(errors, time.Second).Should(Receive())
+				Eventually(errors).Should(Receive(BeRetryable()))
 			}
-		}, 20)
+		})
 
 		Context("with multiple connections", func() {
 			var (
@@ -393,24 +400,70 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 				fakeHandler.Fail = true
 			})
 
-			It("attempts to connect five times", func() {
+			It("exponentially backs off", func() {
+				ts := make(chan time.Duration, 100)
+				done := make(chan struct{})
 
-				fakeHandler.Close()
+				var wg sync.WaitGroup
+				wg.Add(1)
+				defer wg.Wait()
+				defer close(done)
+				go func() {
+					defer GinkgoRecover()
+					defer wg.Done()
+					last := time.Now()
+					for {
+						select {
+						case err := <-errors:
+							Expect(err).To(BeRetryable())
+							ts <- time.Since(last)
+							last = time.Now()
+						case <-done:
+							return
+						}
+					}
+				}()
 
-				for i := uint(0); i < retries; i++ {
-					Eventually(errors).Should(Receive())
-				}
+				Eventually(ts).Should(Receive(BeNumerically("<", 50*time.Millisecond)))
+				Eventually(ts).Should(Receive(BeNumerically("~", 100*time.Millisecond, 50*time.Millisecond)))
+				Eventually(ts).Should(Receive(BeNumerically("~", 200*time.Millisecond, 50*time.Millisecond)))
+				Eventually(ts).Should(Receive(BeNumerically("~", 400*time.Millisecond, 50*time.Millisecond)))
 			})
 
-			It("waits 500ms before reconnecting", func() {
-				fakeHandler.Close()
+			It("doesn't go beyond max sleep", func() {
+				ts := make(chan time.Duration, 100)
+				done := make(chan struct{})
 
-				start := time.Now()
-				for i := uint(0); i < retries; i++ {
-					Eventually(errors).Should(Receive())
+				var wg sync.WaitGroup
+				wg.Add(1)
+				defer wg.Wait()
+				defer close(done)
+				go func() {
+					defer GinkgoRecover()
+					defer wg.Done()
+					last := time.Now()
+					for {
+						select {
+						case err := <-errors:
+							Expect(err).To(BeRetryable())
+							ts <- time.Since(last)
+							last = time.Now()
+						case <-done:
+							return
+						}
+					}
+				}()
+
+				Eventually(ts).Should(Receive())
+				timeout := time.After(time.Second)
+				for {
+					select {
+					case delay := <-ts:
+						Expect(delay).To(BeNumerically("<", 550*time.Millisecond))
+					case <-timeout:
+						return
+					}
 				}
-				end := time.Now()
-				Expect(end).To(BeTemporally(">=", start.Add(4*500*time.Millisecond)))
 			})
 
 			It("will not attempt reconnect if consumer is closed", func() {
@@ -502,6 +555,7 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 					var err error
 					Eventually(errors).Should(Receive(&err))
 					Expect(err).To(HaveOccurred())
+					Expect(err).ToNot(BeRetryable())
 					Expect(err.Error()).To(ContainSubstring("Please ask your Cloud Foundry Operator"))
 
 					close(done)
@@ -518,10 +572,10 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 				})
 
 				It("it returns a helpful error message", func() {
-
 					var err error
 					Eventually(errors).Should(Receive(&err))
 					Expect(err).To(HaveOccurred())
+					Expect(err).ToNot(BeRetryable())
 					Expect(err.Error()).To(ContainSubstring("You are not authorized. Helpful message"))
 				})
 			})
@@ -558,52 +612,62 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 			envelopes, errors = cnsmr.Stream(appGuid, authToken)
 		})
 
-		Context("connection errors", func() {
+		Context("when the connection fails", func() {
 			BeforeEach(func() {
 				fakeHandler.Fail = true
 			})
 
-			It("attempts to connect five times", func() {
-				fakeHandler.Close()
+			It("exponentially backs off", func() {
+				ts := make(chan time.Duration, 100)
+				done := make(chan struct{})
 
-				for i := 0; i < 5; i++ {
-					Eventually(errors).Should(Receive())
-				}
+				var wg sync.WaitGroup
+				wg.Add(1)
+				defer wg.Wait()
+				defer close(done)
+				go func() {
+					defer GinkgoRecover()
+					defer wg.Done()
+					last := time.Now()
+					for {
+						select {
+						case err := <-errors:
+							Expect(err).To(BeRetryable())
+							ts <- time.Since(last)
+							last = time.Now()
+						case <-done:
+							return
+						}
+					}
+				}()
+
+				Eventually(ts).Should(Receive(BeNumerically("<", 50*time.Millisecond)))
+				Eventually(ts).Should(Receive(BeNumerically("~", 100*time.Millisecond, 50*time.Millisecond)))
+				Eventually(ts).Should(Receive(BeNumerically("~", 200*time.Millisecond, 50*time.Millisecond)))
+				Eventually(ts).Should(Receive(BeNumerically("~", 400*time.Millisecond, 50*time.Millisecond)))
 			})
 		})
 
-		It("waits 500ms before reconnecting", func() {
-			fakeHandler.Close()
-			start := time.Now()
-			for i := 0; i < 5; i++ {
-				Eventually(errors).Should(Receive())
-			}
-			end := time.Now()
-			Expect(end).To(BeTemporally(">=", start.Add(4*500*time.Millisecond)))
-		})
-
-		It("resets the attempt counter after a successful connection", func(done Done) {
-			defer close(done)
-
+		It("resets the delay after a successful connection", func() {
 			fakeHandler.InputChan <- marshalMessage(createMessage("message 1", 0))
 			Eventually(envelopes).Should(Receive())
 
 			fakeHandler.Close()
-
 			expectedErrorCount := 4
 			for i := 0; i < expectedErrorCount; i++ {
-				Eventually(errors).Should(Receive())
+				Eventually(errors, time.Second).Should(Receive(BeRetryable()))
 			}
 			fakeHandler.Reset()
 
 			fakeHandler.InputChan <- marshalMessage(createMessage("message 2", 0))
 
 			Eventually(envelopes).Should(Receive())
+
 			fakeHandler.Close()
-			for i := 0; i < 5; i++ {
-				Eventually(errors).Should(Receive())
+			for i := uint(0); i < 3; i++ {
+				Eventually(errors).Should(Receive(BeRetryable()))
 			}
-		}, 10)
+		})
 	})
 
 	Describe("Close", func() {
@@ -664,38 +728,8 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 			errors    <-chan error
 		)
 
-		JustBeforeEach(func() {
-			envelopes, errors = cnsmr.Firehose("subscription-id", authToken)
-		})
-
 		BeforeEach(func() {
 			startFakeTrafficController()
-		})
-
-		Context("when connection fails", func() {
-			BeforeEach(func() {
-				fakeHandler.Fail = true
-			})
-
-			It("attempts to connect five times", func() {
-				fakeHandler.Close()
-				for i := 0; i < 5; i++ {
-					Eventually(errors).Should(Receive())
-				}
-			})
-		})
-
-		It("waits 500ms before reconnecting", func() {
-
-			fakeHandler.Close()
-			start := time.Now()
-			for i := 0; i < 5; i++ {
-				Eventually(errors).Should(Receive())
-			}
-
-			end := time.Now()
-			Expect(end).To(BeTemporally(">=", start.Add(4*500*time.Millisecond)))
-			cnsmr.Close()
 		})
 
 		Context("with data in the server", func() {
@@ -703,7 +737,11 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 				fakeHandler.InputChan <- marshalMessage(createMessage("message 1", 0))
 			})
 
-			It("resets the attempt counter after a successful connection", func(done Done) {
+			JustBeforeEach(func() {
+				envelopes, errors = cnsmr.Firehose("subscription-id", authToken)
+			})
+
+			It("resets the delay after a successful connection", func(done Done) {
 				defer close(done)
 				Eventually(envelopes).Should(Receive())
 
@@ -711,7 +749,7 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 
 				expectedErrorCount := 4
 				for i := 0; i < expectedErrorCount; i++ {
-					Eventually(errors).Should(Receive())
+					Eventually(errors).Should(Receive(BeRetryable()))
 				}
 				fakeHandler.Reset()
 
@@ -720,9 +758,35 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 				Eventually(envelopes).Should(Receive())
 				fakeHandler.Close()
 				for i := 0; i < 5; i++ {
-					Eventually(errors).Should(Receive())
+					Eventually(errors).Should(Receive(BeRetryable()))
 				}
 			}, 10)
+		})
+
+		Context("when the connection read takes too long", func() {
+			var (
+				idleTimeout time.Duration
+			)
+
+			JustBeforeEach(func() {
+				idleTimeout = 500 * time.Millisecond
+				cnsmr.SetIdleTimeout(idleTimeout)
+				envelopes, errors = cnsmr.Firehose("subscription-id", authToken)
+			})
+
+			It("returns an error when the idle timeout expires", func() {
+				var err error
+				Eventually(errors).Should(Receive(&err))
+				Expect(err).To(HaveOccurred())
+				Expect(err).To(BeRetryable())
+				Expect(err.Error()).To(ContainSubstring("i/o timeout"))
+			})
+
+			It("reestablishes the connection", func() {
+				Eventually(fakeHandler.WasCalled).Should(BeTrue())
+				fakeHandler.Reset()
+				Eventually(fakeHandler.WasCalled).Should(BeTrue())
+			})
 		})
 	})
 
@@ -804,6 +868,7 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 					var err error
 					Eventually(streamErrors).Should(Receive(&err))
 					Expect(err).To(HaveOccurred())
+					Expect(err).ToNot(BeRetryable())
 					Expect(err.Error()).To(ContainSubstring("Please ask your Cloud Foundry Operator"))
 				})
 			})
@@ -821,6 +886,7 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 					var err error
 					Eventually(streamErrors).Should(Receive(&err))
 					Expect(err).To(HaveOccurred())
+					Expect(err).ToNot(BeRetryable())
 					Expect(err.Error()).To(ContainSubstring("You are not authorized. Helpful message"))
 				})
 			})
@@ -835,6 +901,7 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 				var err error
 				Eventually(streamErrors).Should(Receive(&err))
 				Expect(err).To(HaveOccurred())
+				Expect(err).To(BeRetryable())
 				Expect(err.Error()).To(ContainSubstring("i/o timeout"))
 			})
 		})
@@ -856,6 +923,10 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 		})
 	})
 })
+
+func BeRetryable() types.GomegaMatcher {
+	return BeAssignableToTypeOf(errors.RetryError("some-error"))
+}
 
 func createError(message string) *events.Envelope {
 	timestamp := time.Now().UnixNano()
