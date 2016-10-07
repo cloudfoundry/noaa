@@ -274,13 +274,11 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 					trafficControllerURL = "!!!bad-url"
 				})
 
-				It("receives an error on errChan", func(done Done) {
+				It("receives an error on errChan", func() {
 					var err error
 					Eventually(errors).Should(Receive(&err))
 					Expect(err).ToNot(BeRetryable())
 					Expect(err.Error()).To(ContainSubstring("Please ask your Cloud Foundry Operator"))
-
-					close(done)
 				})
 			})
 
@@ -392,6 +390,20 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 				Eventually(errors).Should(BeClosed())
 				Eventually(moreLogMessages).Should(BeClosed())
 				Eventually(moreErrors).Should(BeClosed())
+			})
+		})
+
+		Context("when the connection cannot be established", func() {
+			BeforeEach(func() {
+				trafficControllerURL = `https://invalid`
+			})
+
+			It("returns an error", func() {
+				var err error
+				Eventually(errors).Should(Receive(&err))
+				Expect(err).To(HaveOccurred())
+				Expect(err).ToNot(BeRetryable())
+				Expect(err.Error()).To(ContainSubstring("Please ask your Cloud Foundry Operator"))
 			})
 		})
 
@@ -547,11 +559,10 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 
 			Context("when the connection cannot be established", func() {
 				BeforeEach(func() {
-					trafficControllerURL = "!!!bad-url"
+					trafficControllerURL = `http://invalid`
 				})
 
 				It("returns an error", func(done Done) {
-
 					var err error
 					Eventually(errors).Should(Receive(&err))
 					Expect(err).To(HaveOccurred())
@@ -859,7 +870,7 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 
 			Context("when the connection cannot be established", func() {
 				BeforeEach(func() {
-					trafficControllerURL = "!!!bad-url"
+					trafficControllerURL = "https://invalid"
 				})
 
 				It("returns an error", func(done Done) {

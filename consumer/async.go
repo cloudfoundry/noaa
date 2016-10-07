@@ -281,6 +281,12 @@ func (c *Consumer) retryAction(action func() (err error, done bool), errors chan
 			return
 		}
 
+		if _, ok := err.(noaa_errors.NonRetryError); ok {
+			c.debugPrinter.Print("WEBSOCKET ERROR", fmt.Sprintf("%s. Retrying...", err.Error()))
+			errors <- err
+			return
+		}
+
 		if err != nil {
 			c.debugPrinter.Print("WEBSOCKET ERROR", fmt.Sprintf("%s. Retrying...", err.Error()))
 			err = noaa_errors.NewRetryError(err)
@@ -322,7 +328,15 @@ func (c *Consumer) websocketConn(path, authToken string) (*websocket.Conn, error
 		return c.websocketConnNewToken(path)
 	}
 
-	var err error
+	URL, err := url.Parse(c.trafficControllerUrl + path)
+	if err != nil {
+		return nil, noaa_errors.NewNonRetryError(err)
+	}
+
+	if URL.Scheme != "wss" && URL.Scheme != "ws" {
+		return nil, noaa_errors.NewNonRetryError(fmt.Errorf("Invalid scheme '%s'", URL.Scheme))
+	}
+
 	ws, httpErr := c.tryWebsocketConnection(path, authToken)
 	if httpErr != nil {
 		err = httpErr.error
@@ -361,7 +375,7 @@ func (c *Consumer) establishWebsocketConnection(path, authToken string) (*websoc
 
 func (c *Consumer) tryWebsocketConnection(path, token string) (*websocket.Conn, *httpError) {
 	header := http.Header{"Origin": []string{"http://localhost"}, "Authorization": []string{token}}
-	url := c.trafficControllerUrl + path
+	URL := c.trafficControllerUrl + path
 
 	c.debugPrinter.Print("WEBSOCKET REQUEST:",
 		"GET "+path+" HTTP/1.1\n"+
@@ -369,7 +383,7 @@ func (c *Consumer) tryWebsocketConnection(path, token string) (*websocket.Conn, 
 			"Upgrade: websocket\nConnection: Upgrade\nSec-WebSocket-Version: 13\nSec-WebSocket-Key: [HIDDEN]\n"+
 			headersString(header))
 
-	ws, resp, err := c.dialer.Dial(url, header)
+	ws, resp, err := c.dialer.Dial(URL, header)
 	if resp != nil {
 		c.debugPrinter.Print("WEBSOCKET RESPONSE:",
 			resp.Proto+" "+resp.Status+"\n"+
@@ -387,7 +401,7 @@ func (c *Consumer) tryWebsocketConnection(path, token string) (*websocket.Conn, 
 	if err != nil {
 		errMsg := "Error dialing trafficcontroller server: %s.\n" +
 			"Please ask your Cloud Foundry Operator to check the platform configuration (trafficcontroller is %s)."
-		httpErr.error = errors.New(fmt.Sprintf(errMsg, err.Error(), c.trafficControllerUrl))
+		httpErr.error = fmt.Errorf(errMsg, err.Error(), c.trafficControllerUrl)
 		return nil, httpErr
 	}
 	return ws, nil
