@@ -2,6 +2,7 @@ package consumer_test
 
 import (
 	"crypto/tls"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -936,7 +937,7 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 })
 
 func BeRetryable() types.GomegaMatcher {
-	return BeAssignableToTypeOf(errors.RetryError("some-error"))
+	return BeAssignableToTypeOf(errors.NewRetryError(fmt.Errorf("some-error")))
 }
 
 func createError(message string) *events.Envelope {
