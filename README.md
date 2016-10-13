@@ -4,7 +4,7 @@
 [![Coverage Status](https://coveralls.io/repos/cloudfoundry/noaa/badge.png)](https://coveralls.io/r/cloudfoundry/noaa)
 [![GoDoc](https://godoc.org/github.com/cloudfoundry/noaa?status.png)](https://godoc.org/github.com/cloudfoundry/noaa)
 
-NOAA is a client library to consume metric and log messages from Doppler.
+noaa is a client library to consume metric and log messages from Doppler.
 
 ##WARNING
 
@@ -43,7 +43,7 @@ This Go project is designed to be imported into `$GOPATH`, rather than being clo
   $ go get ./...
   ```
 
-## Update
+## Updates
 
 ### Reconnecting to Traffic Controller
 
