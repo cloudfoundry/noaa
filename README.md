@@ -45,7 +45,7 @@ This Go project is designed to be imported into `$GOPATH`, rather than being clo
 
 ## Update
 
-## Reconnecting to Traffic Controller
+### Reconnecting to Traffic Controller
 
 noaa has recently updated its reconnect strategy from trying to reconnect five
 times in quick succession to a back-off strategy. The back-off strategy can be
