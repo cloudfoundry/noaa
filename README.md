@@ -25,9 +25,9 @@ This Go project is designed to be imported into `$GOPATH`, rather than being clo
   ```
   $ echo $GOPATH
   /Users/myuser/go
-  
+
   $ go get github.com/cloudfoundry/noaa
-  
+
   $ ls ~/go/src/github.com/cloudfoundry/
   noaa/         sonde-go/
   ```
@@ -36,12 +36,28 @@ This Go project is designed to be imported into `$GOPATH`, rather than being clo
   ```
   $ echo $GOPATH
   /Users/myuser/go
-  
+
   $ cd /Users/myuser/go/src/github.com/cloudfoundry
   $ git clone git@github.com:cloudfoundry/noaa.git
   $ cd noaa
   $ go get ./...
   ```
+
+## Update
+
+## Reconnecting to Traffic Controller
+
+noaa has recently updated its reconnect strategy from trying to reconnect five
+times in quick succession to a back-off strategy. The back-off strategy can be
+configured by setting the [SetMinRetryDelay()](https://godoc.org/github.com/cloudfoundry/noaa/consumer#Consumer.SetMinRetryDelay)
+and the [SetMaxRetryDelay()](https://godoc.org/github.com/cloudfoundry/noaa/consumer#Consumer.SetMaxRetryDelay).
+
+During reconnection, noaa will wait initially at the `MinRetryDelay` interval
+and double until it reaches `MaxRetryDelay` where it will try reconnecting
+indefinitely at the `MaxRetryDelay` interval.
+
+This behavior will affect functions like `consumer.Firehose()`, `consumer.Stream()`
+and `consumer.TailingLogs`.
 
 ## Sample Applications
 
