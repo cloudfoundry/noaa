@@ -57,7 +57,7 @@ and double until it reaches `MaxRetryDelay` where it will try reconnecting
 indefinitely at the `MaxRetryDelay` interval.
 
 This behavior will affect functions like `consumer.Firehose()`, `consumer.Stream()`
-and `consumer.TailingLogs`.
+and `consumer.TailingLogs()`.
 
 ## Sample Applications
 
