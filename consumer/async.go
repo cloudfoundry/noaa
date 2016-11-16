@@ -268,7 +268,7 @@ func (c *Consumer) retryAction(action func() (err error, done bool), errors chan
 	defer c.SetOnConnectCallback(oldConnectCallback)
 
 	context := retryContext{
-		sleep:  atomic.LoadInt64(&c.minRetryDelay),
+		sleep: atomic.LoadInt64(&c.minRetryDelay),
 	}
 
 	c.SetOnConnectCallback(func() {

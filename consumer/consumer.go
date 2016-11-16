@@ -64,7 +64,6 @@ type Consumer struct {
 	refreshTokens  bool
 	refresherMutex sync.RWMutex
 	tokenRefresher TokenRefresher
-
 }
 
 // New creates a new consumer to a trafficcontroller.
