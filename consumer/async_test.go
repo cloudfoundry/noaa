@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudfoundry/loggregatorlib/loggertesthelper"
 	"github.com/cloudfoundry/loggregatorlib/server/handlers"
 	"github.com/cloudfoundry/noaa/consumer"
 	"github.com/cloudfoundry/noaa/errors"
@@ -60,7 +59,7 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 
 	Describe("SetOnConnectCallback", func() {
 		BeforeEach(func() {
-			testServer = httptest.NewServer(handlers.NewWebsocketHandler(messagesToSend, 100*time.Millisecond, loggertesthelper.Logger()))
+			testServer = httptest.NewServer(handlers.NewWebsocketHandler(messagesToSend, 100*time.Millisecond))
 			trafficControllerURL = "ws://" + testServer.Listener.Addr().String()
 			close(messagesToSend)
 		})
@@ -122,7 +121,7 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 		fakeHandler = &test_helpers.FakeHandler{
 			InputChan: make(chan []byte, 10),
 			GenerateHandler: func(input chan []byte) http.Handler {
-				return handlers.NewWebsocketHandler(input, 100*time.Millisecond, loggertesthelper.Logger())
+				return handlers.NewWebsocketHandler(input, 100*time.Millisecond)
 			},
 		}
 
@@ -303,7 +302,7 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 
 		Context("when SSL settings are passed in", func() {
 			BeforeEach(func() {
-				testServer = httptest.NewTLSServer(handlers.NewWebsocketHandler(messagesToSend, 100*time.Millisecond, loggertesthelper.Logger()))
+				testServer = httptest.NewTLSServer(handlers.NewWebsocketHandler(messagesToSend, 100*time.Millisecond))
 				trafficControllerURL = "wss://" + testServer.Listener.Addr().String()
 
 				tlsSettings = &tls.Config{InsecureSkipVerify: true}
@@ -595,7 +594,7 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 
 		Context("when SSL settings are passed in", func() {
 			BeforeEach(func() {
-				testServer = httptest.NewTLSServer(handlers.NewWebsocketHandler(messagesToSend, 100*time.Millisecond, loggertesthelper.Logger()))
+				testServer = httptest.NewTLSServer(handlers.NewWebsocketHandler(messagesToSend, 100*time.Millisecond))
 				trafficControllerURL = "wss://" + testServer.Listener.Addr().String()
 
 				tlsSettings = &tls.Config{InsecureSkipVerify: true}
@@ -920,7 +919,7 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 
 		Context("when SSL settings are passed in", func() {
 			BeforeEach(func() {
-				testServer = httptest.NewTLSServer(handlers.NewWebsocketHandler(messagesToSend, 100*time.Millisecond, loggertesthelper.Logger()))
+				testServer = httptest.NewTLSServer(handlers.NewWebsocketHandler(messagesToSend, 100*time.Millisecond))
 				trafficControllerURL = "wss://" + testServer.Listener.Addr().String()
 
 				tlsSettings = &tls.Config{InsecureSkipVerify: true}

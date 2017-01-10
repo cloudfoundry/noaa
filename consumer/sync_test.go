@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"github.com/cloudfoundry/loggregatorlib/loggertesthelper"
 	"github.com/cloudfoundry/loggregatorlib/server/handlers"
 	"github.com/cloudfoundry/noaa/consumer"
 	"github.com/cloudfoundry/noaa/errors"
@@ -79,7 +78,7 @@ var _ = Describe("Consumer (Synchronous)", func() {
 
 		Context("when the connection can be established", func() {
 			BeforeEach(func() {
-				testServer = httptest.NewServer(handlers.NewHttpHandler(messagesToSend, loggertesthelper.Logger()))
+				testServer = httptest.NewServer(handlers.NewHttpHandler(messagesToSend))
 				trafficControllerURL = "ws://" + testServer.Listener.Addr().String()
 
 				messagesToSend <- marshalMessage(createMessage("test-message-0", 0))
@@ -117,7 +116,7 @@ var _ = Describe("Consumer (Synchronous)", func() {
 					ContentLen: "",
 					InputChan:  make(chan []byte, 10),
 					GenerateHandler: func(input chan []byte) http.Handler {
-						return handlers.NewHttpHandler(input, loggertesthelper.Logger())
+						return handlers.NewHttpHandler(input)
 					},
 				}
 				testServer = httptest.NewServer(fakeHandler)
@@ -209,7 +208,7 @@ var _ = Describe("Consumer (Synchronous)", func() {
 		var handler *handlers.HttpHandler
 
 		BeforeEach(func() {
-			handler = handlers.NewHttpHandler(messagesToSend, loggertesthelper.Logger())
+			handler = handlers.NewHttpHandler(messagesToSend)
 			testServer = httptest.NewServer(handler)
 			trafficControllerURL = "ws://" + testServer.Listener.Addr().String()
 		})
@@ -258,7 +257,7 @@ var _ = Describe("Consumer (Synchronous)", func() {
 
 		Context("when the connection can be established", func() {
 			BeforeEach(func() {
-				testServer = httptest.NewServer(handlers.NewHttpHandler(messagesToSend, loggertesthelper.Logger()))
+				testServer = httptest.NewServer(handlers.NewHttpHandler(messagesToSend))
 				trafficControllerURL = "ws://" + testServer.Listener.Addr().String()
 			})
 
@@ -310,7 +309,7 @@ var _ = Describe("Consumer (Synchronous)", func() {
 					ContentLen: "",
 					InputChan:  make(chan []byte, 10),
 					GenerateHandler: func(input chan []byte) http.Handler {
-						return handlers.NewHttpHandler(input, loggertesthelper.Logger())
+						return handlers.NewHttpHandler(input)
 					},
 				}
 				testServer = httptest.NewServer(fakeHandler)

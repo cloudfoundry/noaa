@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"time"
 
-	"github.com/cloudfoundry/loggregatorlib/loggertesthelper"
 	"github.com/cloudfoundry/loggregatorlib/server/handlers"
 	"github.com/cloudfoundry/noaa/consumer"
 
@@ -26,7 +25,7 @@ var _ = Describe("RefreshTokenFrom", func() {
 
 		BeforeEach(func() {
 			testHandler = &errorRespondingHandler{
-				subHandler:       handlers.NewWebsocketHandler(make(chan []byte), 100*time.Millisecond, loggertesthelper.Logger()),
+				subHandler:       handlers.NewWebsocketHandler(make(chan []byte), 100*time.Millisecond),
 				responseStatuses: make(chan int, 10),
 			}
 			server := httptest.NewServer(testHandler)
