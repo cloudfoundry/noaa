@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/cloudfoundry/loggregatorlib/server/handlers"
 	"github.com/cloudfoundry/noaa/consumer"
 	"github.com/cloudfoundry/sonde-go/events"
 	"github.com/elazarl/goproxy"
@@ -34,7 +33,7 @@ var _ = Describe("Consumer connecting through a Proxy", func() {
 
 	BeforeEach(func() {
 		messagesToSend = make(chan []byte, 256)
-		testServer = httptest.NewServer(handlers.NewWebsocketHandler(messagesToSend, 100*time.Millisecond))
+		testServer = httptest.NewServer(NewWebsocketHandler(messagesToSend, 100*time.Millisecond))
 		endpoint = "ws://" + testServer.Listener.Addr().String()
 
 		goProxyHandler = goproxy.NewProxyHttpServer()
@@ -197,7 +196,7 @@ var _ = Describe("Consumer connecting through a Proxy", func() {
 		)
 
 		BeforeEach(func() {
-			httpTestServer = httptest.NewServer(handlers.NewHttpHandler(messagesToSend))
+			httpTestServer = httptest.NewServer(NewHttpHandler(messagesToSend))
 			endpoint = "ws://" + httpTestServer.Listener.Addr().String()
 		})
 

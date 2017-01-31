@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"github.com/cloudfoundry/loggregatorlib/server/handlers"
 	"github.com/cloudfoundry/noaa/consumer"
 	"github.com/cloudfoundry/noaa/errors"
 	"github.com/cloudfoundry/noaa/test_helpers"
@@ -78,7 +77,7 @@ var _ = Describe("Consumer (Synchronous)", func() {
 
 		Context("when the connection can be established", func() {
 			BeforeEach(func() {
-				testServer = httptest.NewServer(handlers.NewHttpHandler(messagesToSend))
+				testServer = httptest.NewServer(NewHttpHandler(messagesToSend))
 				trafficControllerURL = "ws://" + testServer.Listener.Addr().String()
 
 				messagesToSend <- marshalMessage(createMessage("test-message-0", 0))
@@ -116,7 +115,7 @@ var _ = Describe("Consumer (Synchronous)", func() {
 					ContentLen: "",
 					InputChan:  make(chan []byte, 10),
 					GenerateHandler: func(input chan []byte) http.Handler {
-						return handlers.NewHttpHandler(input)
+						return NewHttpHandler(input)
 					},
 				}
 				testServer = httptest.NewServer(fakeHandler)
@@ -205,10 +204,10 @@ var _ = Describe("Consumer (Synchronous)", func() {
 	})
 
 	Describe("ContainerMetrics", func() {
-		var handler *handlers.HttpHandler
+		var handler *HttpHandler
 
 		BeforeEach(func() {
-			handler = handlers.NewHttpHandler(messagesToSend)
+			handler = NewHttpHandler(messagesToSend)
 			testServer = httptest.NewServer(handler)
 			trafficControllerURL = "ws://" + testServer.Listener.Addr().String()
 		})
@@ -257,7 +256,7 @@ var _ = Describe("Consumer (Synchronous)", func() {
 
 		Context("when the connection can be established", func() {
 			BeforeEach(func() {
-				testServer = httptest.NewServer(handlers.NewHttpHandler(messagesToSend))
+				testServer = httptest.NewServer(NewHttpHandler(messagesToSend))
 				trafficControllerURL = "ws://" + testServer.Listener.Addr().String()
 			})
 
@@ -309,7 +308,7 @@ var _ = Describe("Consumer (Synchronous)", func() {
 					ContentLen: "",
 					InputChan:  make(chan []byte, 10),
 					GenerateHandler: func(input chan []byte) http.Handler {
-						return handlers.NewHttpHandler(input)
+						return NewHttpHandler(input)
 					},
 				}
 				testServer = httptest.NewServer(fakeHandler)
