@@ -47,7 +47,7 @@ type Consumer struct {
 	// minRetryDelay and maxRetryDelay must be the first words in this struct
 	// in order to be used atomically by 32-bit systems.
 	// https://golang.org/src/sync/atomic/doc.go?#L50
-	minRetryDelay, maxRetryDelay int64
+	minRetryDelay, maxRetryDelay, retryTimeout int64
 
 	trafficControllerUrl string
 	idleTimeout          time.Duration

@@ -46,6 +46,13 @@ func (c *Consumer) SetMaxRetryDelay(d time.Duration) {
 	atomic.StoreInt64(&c.maxRetryDelay, int64(d))
 }
 
+// SetRetryTimeout sets the overall timeout for retry actions.
+//
+// Defaults to 0/unlimited.
+func (c *Consumer) SetRetryTimeout(d time.Duration) {
+	atomic.StoreInt64(&c.retryTimeout, int64(d))
+}
+
 // TailingLogs listens indefinitely for log messages only; other event types
 // are dropped.
 // Whenever an error is encountered, the error will be sent down the error
@@ -278,7 +285,14 @@ func (c *Consumer) retryAction(action func() (err error, done bool), errors chan
 		}
 	})
 
-	for {
+	var timeout time.Time
+	if t := atomic.LoadInt64(&c.retryTimeout); t > 0 {
+		timeout = time.Now().Add(time.Duration(t))
+	} else {
+		timeout = time.Unix(1<<63-62135596801, 999999999)
+	}
+
+	for time.Now().Before(timeout) {
 		err, done := action()
 		if done {
 			return
@@ -305,6 +319,8 @@ func (c *Consumer) retryAction(action func() (err error, done bool), errors chan
 			atomic.StoreInt64(&context.sleep, max)
 		}
 	}
+
+	errors <- noaa_errors.NewRetryTimeoutError()
 }
 
 func (c *Consumer) isTimeoutErr(err error) bool {
