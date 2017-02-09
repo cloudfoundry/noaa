@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/cloudfoundry/noaa/consumer"
-	"github.com/cloudfoundry/noaa/errors"
+	noaa_errors "github.com/cloudfoundry/noaa/errors"
 	"github.com/cloudfoundry/noaa/test_helpers"
 	"github.com/cloudfoundry/sonde-go/events"
 	"github.com/gogo/protobuf/proto"
@@ -338,17 +338,20 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 
 	Describe("TailingLogs", func() {
 		var (
-			logMessages <-chan *events.LogMessage
-			errors      <-chan error
-			retries     uint
+			logMessages  <-chan *events.LogMessage
+			errors       <-chan error
+			retries      uint
+			retryTimeout time.Duration
 		)
 
 		BeforeEach(func() {
 			retries = 5
+			retryTimeout = 0
 			startFakeTrafficController()
 		})
 
 		JustBeforeEach(func() {
+			cnsmr.SetRetryTimeout(retryTimeout)
 			logMessages, errors = cnsmr.TailingLogs(appGuid, authToken)
 		})
 
@@ -403,6 +406,18 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 				Expect(err).To(HaveOccurred())
 				Expect(err).ToNot(BeRetryable())
 				Expect(err.Error()).To(ContainSubstring("Please ask your Cloud Foundry Operator"))
+			})
+		})
+
+		Context("when connection cannot be established before retryTimeout", func() {
+			BeforeEach(func() {
+				retryTimeout = time.Nanosecond
+			})
+
+			It("sends a timeout error to the channel and returns", func() {
+				var err error
+				Eventually(errors).Should(Receive(&err))
+				Expect(err).To(MatchError(noaa_errors.RetryTimeoutError{}))
 			})
 		})
 
@@ -935,7 +950,7 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 })
 
 func BeRetryable() types.GomegaMatcher {
-	return BeAssignableToTypeOf(errors.NewRetryError(fmt.Errorf("some-error")))
+	return BeAssignableToTypeOf(noaa_errors.NewRetryError(fmt.Errorf("some-error")))
 }
 
 func createError(message string) *events.Envelope {
