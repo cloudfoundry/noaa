@@ -26,6 +26,7 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 		testServer           *httptest.Server
 		fakeHandler          *test_helpers.FakeHandler
 		tlsSettings          *tls.Config
+		maxRetryCount        int
 
 		appGuid        string
 		authToken      string
@@ -37,6 +38,7 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 		testServer = nil
 		fakeHandler = nil
 		tlsSettings = nil
+		maxRetryCount = consumer.DefaultMaxRetryCount
 
 		appGuid = ""
 		authToken = ""
@@ -47,6 +49,7 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 		cnsmr = consumer.New(trafficControllerURL, tlsSettings, nil)
 		cnsmr.SetMinRetryDelay(100 * time.Millisecond)
 		cnsmr.SetMaxRetryDelay(500 * time.Millisecond)
+		cnsmr.SetMaxRetryCount(maxRetryCount)
 	})
 
 	AfterEach(func() {
@@ -373,6 +376,32 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 			}
 		})
 
+		Context("when maxRetryCount is set", func() {
+			BeforeEach(func() {
+				maxRetryCount = 3
+			})
+
+			It("resets the count after a successful connection", func() {
+				fakeHandler.InputChan <- marshalMessage(createMessage("message 1", 0))
+				Eventually(logMessages).Should(Receive())
+
+				fakeHandler.Close()
+				for i := 0; i < maxRetryCount-1; i++ {
+					Eventually(errors, time.Second).Should(Receive(HaveOccurred()))
+				}
+				fakeHandler.Reset()
+
+				fakeHandler.InputChan <- marshalMessage(createMessage("message 2", 0))
+
+				Eventually(logMessages).Should(Receive())
+
+				fakeHandler.Close()
+				for i := 0; i < maxRetryCount-1; i++ {
+					Eventually(errors).Should(Receive(BeRetryable()))
+				}
+			})
+		})
+
 		Context("with multiple connections", func() {
 			var (
 				moreLogMessages <-chan *events.LogMessage
@@ -475,6 +504,21 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 						return
 					}
 				}
+			})
+
+			Context("when maxRetryCount is set", func() {
+				BeforeEach(func() {
+					maxRetryCount = 3
+				})
+
+				It("doesn't go beyond maxRetryCount", func() {
+					for i := 0; i < maxRetryCount; i++ {
+						Eventually(errors).Should(Receive(BeRetryable()))
+					}
+					Eventually(errors).Should(Receive(Equal(consumer.ErrMaxRetriesReached)))
+					Eventually(logMessages).Should(BeClosed())
+					Eventually(errors).Should(BeClosed())
+				})
 			})
 
 			It("will not attempt reconnect if consumer is closed", func() {
