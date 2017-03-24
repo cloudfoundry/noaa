@@ -400,7 +400,7 @@ func (c *Consumer) tryWebsocketConnection(path, token string) (*websocket.Conn, 
 	header := http.Header{"Origin": []string{"http://localhost"}, "Authorization": []string{token}}
 	URL := c.trafficControllerUrl + path
 
-	c.debugPrinter.Print("WEBSOCKET REQUEST:",
+	c.debugPrinter.Print("WEBSOCKET REQUEST",
 		"GET "+path+" HTTP/1.1\n"+
 			"Host: "+c.trafficControllerUrl+"\n"+
 			"Upgrade: websocket\nConnection: Upgrade\nSec-WebSocket-Version: 13\nSec-WebSocket-Key: [HIDDEN]\n"+
@@ -408,7 +408,7 @@ func (c *Consumer) tryWebsocketConnection(path, token string) (*websocket.Conn, 
 
 	ws, resp, err := c.dialer.Dial(URL, header)
 	if resp != nil {
-		c.debugPrinter.Print("WEBSOCKET RESPONSE:",
+		c.debugPrinter.Print("WEBSOCKET RESPONSE",
 			resp.Proto+" "+resp.Status+"\n"+
 				headersString(resp.Header))
 	}
