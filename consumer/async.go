@@ -394,7 +394,7 @@ func (c *Consumer) establishWebsocketConnection(path, authToken string) (*websoc
 }
 
 func (c *Consumer) tryWebsocketConnection(path, token string) (*websocket.Conn, *httpError) {
-	header := http.Header{"Origin": []string{"http://localhost"}, "Authorization": []string{token}}
+	header := http.Header{"Origin": []string{c.trafficControllerUrl}, "Authorization": []string{token}}
 	url := c.trafficControllerUrl + path
 
 	c.debugPrinter.Print("WEBSOCKET REQUEST",
