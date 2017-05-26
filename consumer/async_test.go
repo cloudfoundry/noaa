@@ -976,6 +976,24 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 			})
 		})
 	})
+
+	Describe("FilteredFirehose", func() {
+		BeforeEach(func() {
+			startFakeTrafficController()
+		})
+
+		It("appends the correct query string for filtering log messages", func() {
+			cnsmr.FilteredFirehose("subscription-id", authToken, consumer.LogMessages)
+			fakeHandler.Close()
+			Eventually(fakeHandler.GetLastURL).Should(ContainSubstring("/firehose/subscription-id?filter-type=logs"))
+		})
+
+		It("appends the correct query string for filtering metrics", func() {
+			cnsmr.FilteredFirehose("subscription-id", authToken, consumer.Metrics)
+			fakeHandler.Close()
+			Eventually(fakeHandler.GetLastURL).Should(ContainSubstring("/firehose/subscription-id?filter-type=metrics"))
+		})
+	})
 })
 
 func BeRetryable() types.GomegaMatcher {
