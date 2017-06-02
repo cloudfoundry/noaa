@@ -12,6 +12,8 @@ import (
 
 	"github.com/cloudfoundry/noaa/consumer/internal"
 
+	"fmt"
+
 	noaa_errors "github.com/cloudfoundry/noaa/errors"
 	"github.com/gorilla/websocket"
 )
@@ -42,6 +44,8 @@ type nullDebugPrinter struct {
 func (nullDebugPrinter) Print(title, body string) {
 }
 
+type RecentPathBuilder func(trafficControllerUrl *url.URL, appGuid string, endpoint string) string
+
 // Consumer represents the actions that can be performed against trafficcontroller.
 // See sync.go and async.go for trafficcontroller access methods.
 type Consumer struct {
@@ -64,6 +68,8 @@ type Consumer struct {
 	refreshTokens  bool
 	refresherMutex sync.RWMutex
 	tokenRefresher TokenRefresher
+
+	recentPathBuilder RecentPathBuilder
 }
 
 // New creates a new consumer to a trafficcontroller.
@@ -92,7 +98,22 @@ func New(trafficControllerUrl string, tlsConfig *tls.Config, proxy func(*http.Re
 			Proxy:            proxy,
 			TLSClientConfig:  tlsConfig,
 		},
+		recentPathBuilder: defaultRecentPathBuilder,
 	}
+}
+
+func defaultRecentPathBuilder(trafficControllerUrl *url.URL, appGuid string, endpoint string) string {
+	scheme := "https"
+	if trafficControllerUrl.Scheme == "ws" {
+		scheme = "http"
+	}
+
+	return fmt.Sprintf("%s://%s/apps/%s/%s", scheme, trafficControllerUrl.Host, appGuid, endpoint)
+
+}
+
+func (c *Consumer) SetRecentPathBuilder(b RecentPathBuilder) {
+	c.recentPathBuilder = b
 }
 
 type httpError struct {
