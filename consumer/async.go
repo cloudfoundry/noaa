@@ -319,7 +319,7 @@ func (c *Consumer) retryAction(action func() (err error, done bool), errors chan
 		}
 
 		if _, ok := err.(noaa_errors.NonRetryError); ok {
-			c.debugPrinter.Print("WEBSOCKET ERROR", fmt.Sprintf("%s. Retrying...", err.Error()))
+			c.debugPrinter.Print("WEBSOCKET ERROR", err.Error())
 			errors <- err
 			return
 		}
