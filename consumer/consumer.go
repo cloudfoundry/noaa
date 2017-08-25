@@ -45,6 +45,7 @@ func (nullDebugPrinter) Print(title, body string) {
 }
 
 type RecentPathBuilder func(trafficControllerUrl *url.URL, appGuid string, endpoint string) string
+type StreamPathBuilder func(appGuid string) string
 
 // Consumer represents the actions that can be performed against trafficcontroller.
 // See sync.go and async.go for trafficcontroller access methods.
@@ -70,6 +71,7 @@ type Consumer struct {
 	tokenRefresher TokenRefresher
 
 	recentPathBuilder RecentPathBuilder
+	streamPathBuilder StreamPathBuilder
 }
 
 // New creates a new consumer to a trafficcontroller.
@@ -99,6 +101,7 @@ func New(trafficControllerUrl string, tlsConfig *tls.Config, proxy func(*http.Re
 			TLSClientConfig:  tlsConfig,
 		},
 		recentPathBuilder: defaultRecentPathBuilder,
+		streamPathBuilder: defaultStreamPathBuilder,
 	}
 }
 
@@ -114,6 +117,14 @@ func defaultRecentPathBuilder(trafficControllerUrl *url.URL, appGuid string, end
 
 func (c *Consumer) SetRecentPathBuilder(b RecentPathBuilder) {
 	c.recentPathBuilder = b
+}
+
+func defaultStreamPathBuilder(appGuid string) string {
+	return fmt.Sprintf("/apps/%s/stream", appGuid)
+}
+
+func (c *Consumer) SetStreamPathBuilder(b StreamPathBuilder) {
+	c.streamPathBuilder = b
 }
 
 type httpError struct {
