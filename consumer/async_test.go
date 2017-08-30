@@ -31,6 +31,8 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 		appGuid        string
 		authToken      string
 		messagesToSend chan []byte
+
+		streamPathBuilder consumer.StreamPathBuilder
 	)
 
 	BeforeEach(func() {
@@ -43,6 +45,8 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 		appGuid = ""
 		authToken = ""
 		messagesToSend = make(chan []byte, 256)
+
+		streamPathBuilder = nil
 	})
 
 	JustBeforeEach(func() {
@@ -50,6 +54,10 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 		cnsmr.SetMinRetryDelay(100 * time.Millisecond)
 		cnsmr.SetMaxRetryDelay(500 * time.Millisecond)
 		cnsmr.SetMaxRetryCount(maxRetryCount)
+
+		if streamPathBuilder != nil {
+			cnsmr.SetStreamPathBuilder(streamPathBuilder)
+		}
 	})
 
 	AfterEach(func() {
@@ -228,6 +236,20 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 						fakeHandler.Close()
 
 						Eventually(fakeHandler.GetLastURL).Should(ContainSubstring("/apps/the-app-guid/stream"))
+					})
+
+					Context("when a stream path builder is provided", func() {
+						BeforeEach(func() {
+							streamPathBuilder = func(appGuid string) string {
+								return fmt.Sprintf("/logs/%s/stream", appGuid)
+							}
+						})
+
+						It("uses the stream path from the builder", func() {
+							fakeHandler.Close()
+
+							Eventually(fakeHandler.GetLastURL).Should(ContainSubstring("/logs/the-app-guid/stream"))
+						})
 					})
 				})
 
