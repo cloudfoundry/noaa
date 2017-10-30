@@ -235,6 +235,20 @@ var _ = Describe("Consumer (Synchronous)", func() {
 				Expect(recentError).To(MatchError((&errors.UnauthorizedError{}).Error()))
 			})
 		})
+
+		Context("when an invalid envelope is sent", func() {
+			BeforeEach(func() {
+				testServer = httptest.NewServer(NewHttpHandler(messagesToSend))
+				trafficControllerURL = "ws://" + testServer.Listener.Addr().String()
+
+				messagesToSend <- []byte("invalid")
+			})
+
+			It("ignores the envelope", func() {
+				Expect(recentError).NotTo(HaveOccurred())
+				Expect(receivedLogMessages).To(HaveLen(0))
+			})
+		})
 	})
 
 	Describe("ContainerMetrics", func() {
