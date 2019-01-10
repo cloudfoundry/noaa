@@ -781,11 +781,9 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 			})
 
 			Context("and the server is closed", func() {
-				JustBeforeEach(func() {
-					fakeHandler.Close()
-				})
-
 				It("returns errors", func() {
+					fakeHandler.Close()
+
 					var err error
 					Eventually(streamErrors).Should(Receive(&err))
 					Expect(err.Error()).To(ContainSubstring("websocket: close 1000"))
@@ -793,6 +791,19 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 					connErr := cnsmr.Close()
 					Expect(connErr).To(HaveOccurred())
 					Expect(connErr.Error()).To(ContainSubstring("close sent"))
+				})
+
+				It("returns multiple errors when multiple connections fail to close", func() {
+					incomings, streamErrors = cnsmr.StreamWithoutReconnect(appGuid, authToken)
+					fakeHandler.Close()
+
+					var err error
+					Eventually(streamErrors).Should(Receive(&err))
+					Expect(err.Error()).To(ContainSubstring("websocket: close 1000"))
+
+					connErr := cnsmr.Close()
+					Expect(connErr).To(HaveOccurred())
+					Expect(connErr.Error()).To(ContainSubstring("close sent, websocket: close sent"))
 				})
 			})
 		})
