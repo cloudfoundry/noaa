@@ -1,6 +1,5 @@
 # NOAA [![slack.cloudfoundry.org][slack-badge]][loggregator-slack]
 
-[![Concourse Status](https://loggregator.ci.cf-app.com/api/v1/pipelines/submodules/jobs/noaa-unit-tests/badge)](https://loggregator.ci.cf-app.com/teams/main/pipelines/submodules/jobs/noaa-unit-tests)
 [![Coverage Status](https://coveralls.io/repos/cloudfoundry/noaa/badge.png)](https://coveralls.io/r/cloudfoundry/noaa)
 [![GoDoc](https://godoc.org/github.com/cloudfoundry/noaa?status.png)](https://godoc.org/github.com/cloudfoundry/noaa)
 
