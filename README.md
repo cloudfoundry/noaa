@@ -1,9 +1,11 @@
-# NOAA [![slack.cloudfoundry.org][slack-badge]][loggregator-slack]
+# NOAA
 
 [![Coverage Status](https://coveralls.io/repos/cloudfoundry/noaa/badge.png)](https://coveralls.io/r/cloudfoundry/noaa)
 [![GoDoc](https://godoc.org/github.com/cloudfoundry/noaa?status.png)](https://godoc.org/github.com/cloudfoundry/noaa)
 
 noaa is a client library to consume metric and log messages from Doppler.
+
+If you have any questions, or want to get attention for a PR or issue please reach out on the [#logging-and-metrics channel in the cloudfoundry slack](https://cloudfoundry.slack.com/archives/CUW93AF3M)
 
 ## Get the Code
 
@@ -124,7 +126,3 @@ metrics look at the README.md in the container_metrics sample.
 
 Use `go get -d -v -t ./... && ginkgo --race --randomizeAllSpecs --failOnPending --skipMeasurements --cover` to
 run the tests.
-
-
-[slack-badge]:          https://slack.cloudfoundry.org/badge.svg
-[loggregator-slack]:    https://cloudfoundry.slack.com/archives/loggregator
