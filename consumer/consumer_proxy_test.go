@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/cloudfoundry/noaa/consumer"
+	"github.com/cloudfoundry/noaa/v2/consumer"
 	"github.com/cloudfoundry/sonde-go/events"
 	"github.com/elazarl/goproxy"
 	"github.com/elazarl/goproxy/ext/auth"

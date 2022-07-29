@@ -10,11 +10,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudfoundry/noaa/consumer/internal"
+	"github.com/cloudfoundry/noaa/v2/consumer/internal"
 
 	"fmt"
 
-	noaa_errors "github.com/cloudfoundry/noaa/errors"
+	noaa_errors "github.com/cloudfoundry/noaa/v2/errors"
 	"github.com/gorilla/websocket"
 )
 
