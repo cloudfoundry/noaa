@@ -11,7 +11,7 @@ import (
 
 	"github.com/cloudfoundry/noaa"
 	"github.com/cloudfoundry/sonde-go/events"
-	"github.com/gogo/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 )
 
 // RecentLogs connects to trafficcontroller via its 'recentlogs' http(s)
