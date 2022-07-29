@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/cloudfoundry-incubator/uaago"
-	"github.com/cloudfoundry/noaa/consumer"
+	"github.com/cloudfoundry/noaa/v2/consumer"
 )
 
 var (

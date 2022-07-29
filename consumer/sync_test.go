@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"github.com/cloudfoundry/noaa/consumer"
-	"github.com/cloudfoundry/noaa/errors"
-	"github.com/cloudfoundry/noaa/test_helpers"
+	"github.com/cloudfoundry/noaa/v2/consumer"
+	"github.com/cloudfoundry/noaa/v2/errors"
+	"github.com/cloudfoundry/noaa/v2/test_helpers"
 	"github.com/cloudfoundry/sonde-go/events"
 
 	"net/url"

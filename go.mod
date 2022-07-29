@@ -1,4 +1,4 @@
-module github.com/cloudfoundry/noaa
+module github.com/cloudfoundry/noaa/v2
 
 go 1.18
 

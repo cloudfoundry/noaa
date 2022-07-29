@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"time"
 
-	"github.com/cloudfoundry/noaa/consumer"
+	"github.com/cloudfoundry/noaa/v2/consumer"
 
 	. "github.com/apoydence/eachers"
 	. "github.com/onsi/ginkgo"
