@@ -1,7 +1,7 @@
 //go:build tools
 // +build tools
 
-package noaa
+package tools
 
 import (
 	_ "github.com/onsi/ginkgo/ginkgo"
