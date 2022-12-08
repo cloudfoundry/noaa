@@ -157,13 +157,15 @@ var _ = Describe("RefreshTokenFrom", func() {
 
 		Describe("ContainerMetrics", func() {
 			It("uses the token refresher to obtain a new token", func() {
-				cnsmr.ContainerMetrics("some-fake-app-guid", "")
+				_, err := cnsmr.ContainerMetrics("some-fake-app-guid", "")
+				Expect(err).To(HaveOccurred())
 				Eventually(refresher.RefreshAuthTokenCalled).Should(BeCalled())
 			})
 
 			It("loads a token if the provided token fails with 401", func() {
 				statuses <- http.StatusUnauthorized
-				cnsmr.ContainerMetrics("some-fake-app-guid", "")
+				_, err := cnsmr.ContainerMetrics("some-fake-app-guid", "")
+				Expect(err).To(HaveOccurred())
 				Eventually(refresher.RefreshAuthTokenCalled).Should(BeCalled())
 			})
 		})

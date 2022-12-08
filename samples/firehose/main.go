@@ -21,7 +21,7 @@ func main() {
 	filterType := flag.String("filter", "all", "filter messages by 'logs' or 'metrics' (default: all)")
 	flag.Parse()
 
-	cnsmr := consumer.New(dopplerAddress, &tls.Config{InsecureSkipVerify: true}, nil)
+	cnsmr := consumer.New(dopplerAddress, &tls.Config{InsecureSkipVerify: false, MinVersion: tls.VersionTLS12}, nil)
 	cnsmr.SetDebugPrinter(ConsoleDebugPrinter{})
 
 	fmt.Println("===== Streaming Firehose (will only succeed if you have admin credentials)")
