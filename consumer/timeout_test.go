@@ -72,20 +72,4 @@ var _ = Describe("Timeout", func() {
 			Expect(err.Error()).To(ContainSubstring("i/o timeout"))
 		})
 	})
-
-	Describe("RecentLogs", func() {
-		It("times out due to an unresponsive server", func() {
-			defer close(fakeHandler)
-			errs := make(chan error, 10)
-			cnsmr = consumer.New(strings.Replace(testServer.URL, "http", "ws", 1), nil, nil)
-			go func() {
-				_, err := cnsmr.RecentLogs("some-guid", "some-token")
-				errs <- err
-			}()
-
-			var err error
-			Eventually(errs, 2*testTimeout).Should(Receive(&err))
-			Expect(err).To(HaveOccurred())
-		})
-	})
 })

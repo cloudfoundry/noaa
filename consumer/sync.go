@@ -14,24 +14,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// RecentLogs connects to trafficcontroller via its 'recentlogs' http(s)
-// endpoint and returns a slice of recent messages.  It does not guarantee any
-// order of the messages; they are in the order returned by trafficcontroller.
-//
-// The noaa.SortRecent function is provided to sort the data returned by
-// this method.
-func (c *Consumer) RecentLogs(appGuid string, authToken string) ([]*events.LogMessage, error) {
-	envelopes, err := c.readTC(appGuid, authToken, "recentlogs")
-	if err != nil {
-		return nil, err
-	}
-	messages := make([]*events.LogMessage, 0, 200)
-	for _, env := range envelopes {
-		messages = append(messages, env.GetLogMessage())
-	}
-	return messages, nil
-}
-
 // ContainerMetrics is deprecated in favor of ContainerEnvelopes, since
 // returning the ContainerMetric type directly hides important
 // information, like the timestamp.
