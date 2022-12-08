@@ -155,19 +155,6 @@ var _ = Describe("RefreshTokenFrom", func() {
 			cnsmr.RefreshTokenFrom(refresher)
 		})
 
-		Describe("RecentLogs", func() {
-			It("uses the token refresher to obtain a new token", func() {
-				cnsmr.RecentLogs("some-fake-app-guid", "")
-				Eventually(refresher.RefreshAuthTokenCalled).Should(BeCalled())
-			})
-
-			It("loads a token if the provided token fails with 401", func() {
-				statuses <- http.StatusUnauthorized
-				cnsmr.RecentLogs("some-fake-app-guid", "")
-				Eventually(refresher.RefreshAuthTokenCalled).Should(BeCalled())
-			})
-		})
-
 		Describe("ContainerMetrics", func() {
 			It("uses the token refresher to obtain a new token", func() {
 				cnsmr.ContainerMetrics("some-fake-app-guid", "")
