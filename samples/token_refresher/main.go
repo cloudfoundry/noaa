@@ -27,7 +27,7 @@ func main() {
 
 	refresher := tokenRefresher{uaaClient: uaa}
 
-	consumer := consumer.New(dopplerAddress, &tls.Config{InsecureSkipVerify: true}, nil)
+	consumer := consumer.New(dopplerAddress, &tls.Config{InsecureSkipVerify: false, MinVersion: tls.VersionTLS12}, nil)
 	consumer.RefreshTokenFrom(&refresher)
 	consumer.SetDebugPrinter(ConsoleDebugPrinter{})
 

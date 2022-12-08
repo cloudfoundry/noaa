@@ -2,7 +2,6 @@ package consumer
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"mime/multipart"
 	"net/http"
@@ -42,7 +41,7 @@ func (c *Consumer) ContainerEnvelopes(appGuid, authToken string) ([]*events.Enve
 	}
 	for _, env := range envelopes {
 		if env.GetEventType() == events.Envelope_LogMessage {
-			return nil, errors.New(fmt.Sprintf("Upstream error: %s", env.GetLogMessage().GetMessage()))
+			return nil, fmt.Errorf("Upstream error: %s", env.GetLogMessage().GetMessage())
 		}
 	}
 	return envelopes, nil
@@ -126,7 +125,7 @@ func (c *Consumer) tryTCConnection(recentPath, token string) (*http.Response, *h
 Please ask your Cloud Foundry Operator to check the platform configuration (trafficcontroller endpoint is %s).`
 		return nil, &httpError{
 			statusCode: -1,
-			error:      errors.New(fmt.Sprintf(message, err, c.trafficControllerUrl)),
+			error:      fmt.Errorf(message, err, c.trafficControllerUrl),
 		}
 	}
 

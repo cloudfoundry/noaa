@@ -329,7 +329,7 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 				testServer = httptest.NewTLSServer(NewWebsocketHandler(messagesToSend, 100*time.Millisecond))
 				trafficControllerURL = "wss://" + testServer.Listener.Addr().String()
 
-				tlsSettings = &tls.Config{InsecureSkipVerify: true}
+				tlsSettings = &tls.Config{InsecureSkipVerify: true} // #nosec G402
 			})
 
 			It("connects using those settings", func() {
@@ -662,7 +662,7 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 				testServer = httptest.NewTLSServer(NewWebsocketHandler(messagesToSend, 100*time.Millisecond))
 				trafficControllerURL = "wss://" + testServer.Listener.Addr().String()
 
-				tlsSettings = &tls.Config{InsecureSkipVerify: true}
+				tlsSettings = &tls.Config{InsecureSkipVerify: true} // #nosec G402
 			})
 
 			It("connects using those settings", func() {
@@ -998,7 +998,7 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 				testServer = httptest.NewTLSServer(NewWebsocketHandler(messagesToSend, 100*time.Millisecond))
 				trafficControllerURL = "wss://" + testServer.Listener.Addr().String()
 
-				tlsSettings = &tls.Config{InsecureSkipVerify: true}
+				tlsSettings = &tls.Config{InsecureSkipVerify: true} // #nosec G402
 			})
 
 			It("connects using those settings", func() {

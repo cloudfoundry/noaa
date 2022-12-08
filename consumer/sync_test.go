@@ -2,6 +2,7 @@ package consumer_test
 
 import (
 	"crypto/tls"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 
@@ -144,7 +145,8 @@ var _ = Describe("Consumer (Synchronous)", func() {
 				serverMux := http.NewServeMux()
 				serverMux.HandleFunc("/apps/appGuid/containermetrics", func(resp http.ResponseWriter, req *http.Request) {
 					resp.Header().Set("Content-Type", "")
-					resp.Write([]byte("OK"))
+					_, err = resp.Write([]byte("OK"))
+					Expect(err).ToNot(HaveOccurred())
 				})
 				testServer = httptest.NewServer(serverMux)
 				trafficControllerURL = "ws://" + testServer.Listener.Addr().String()
@@ -183,7 +185,10 @@ var _ = Describe("Consumer (Synchronous)", func() {
 
 				serverMux := http.NewServeMux()
 				serverMux.HandleFunc("/apps/appGuid/containermetrics", func(resp http.ResponseWriter, req *http.Request) {
-					resp.Write([]byte("OK"))
+					_, err = resp.Write([]byte("OK"))
+					if err != nil {
+						fmt.Printf("error writing response: %s", err)
+					}
 				})
 				testServer = httptest.NewServer(serverMux)
 				trafficControllerURL = "ws://" + testServer.Listener.Addr().String()
@@ -203,7 +208,10 @@ var _ = Describe("Consumer (Synchronous)", func() {
 				serverMux := http.NewServeMux()
 				serverMux.HandleFunc("/apps/appGuid/containermetrics", func(resp http.ResponseWriter, req *http.Request) {
 					resp.Header().Set("Content-Type", "boundary=")
-					resp.Write([]byte("OK"))
+					_, err = resp.Write([]byte("OK"))
+					if err != nil {
+						fmt.Printf("error writing response: %s", err)
+					}
 				})
 				testServer = httptest.NewServer(serverMux)
 				trafficControllerURL = "ws://" + testServer.Listener.Addr().String()

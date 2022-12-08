@@ -20,7 +20,7 @@ func (h nullHandler) ServeHTTP(http.ResponseWriter, *http.Request) {
 
 const (
 	appGuid     = "fakeAppGuid"
-	authToken   = "fakeAuthToken"
+	authTkn     = "fakeAuthToken"
 	testTimeout = 1 * time.Second
 )
 
@@ -53,7 +53,7 @@ var _ = Describe("Timeout", func() {
 			defer close(fakeHandler)
 			cnsmr = consumer.New(strings.Replace(testServer.URL, "http", "ws", 1), nil, nil)
 
-			_, errCh := cnsmr.TailingLogsWithoutReconnect(appGuid, authToken)
+			_, errCh := cnsmr.TailingLogsWithoutReconnect(appGuid, authTkn)
 			var err error
 			Eventually(errCh, 2*testTimeout).Should(Receive(&err))
 			Expect(err.Error()).To(ContainSubstring("i/o timeout"))
@@ -66,7 +66,7 @@ var _ = Describe("Timeout", func() {
 
 			cnsmr = consumer.New(strings.Replace(testServer.URL, "http", "ws", 1), nil, nil)
 
-			_, errCh := cnsmr.Stream(appGuid, authToken)
+			_, errCh := cnsmr.Stream(appGuid, authTkn)
 			var err error
 			Eventually(errCh, 2*testTimeout).Should(Receive(&err))
 			Expect(err.Error()).To(ContainSubstring("i/o timeout"))

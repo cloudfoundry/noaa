@@ -15,19 +15,8 @@ var (
 )
 
 func main() {
-	consumer := consumer.New(dopplerAddress, &tls.Config{InsecureSkipVerify: true}, nil)
+	consumer := consumer.New(dopplerAddress, &tls.Config{InsecureSkipVerify: false, MinVersion: tls.VersionTLS12}, nil)
 	consumer.SetDebugPrinter(ConsoleDebugPrinter{})
-
-	messages, err := consumer.RecentLogs(appGuid, authToken)
-
-	if err != nil {
-		fmt.Printf("===== Error getting recent messages: %v\n", err)
-	} else {
-		fmt.Println("===== Recent logs")
-		for _, msg := range messages {
-			fmt.Println(msg)
-		}
-	}
 
 	fmt.Println("===== Streaming metrics")
 	msgChan, errorChan := consumer.Stream(appGuid, authToken)

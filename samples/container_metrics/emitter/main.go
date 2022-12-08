@@ -21,10 +21,26 @@ func main() {
 
 	for i := uint64(0); ; i++ {
 		println("emitting metric at counter: ", i)
-		metrics.SendContainerMetric(appId, 0, 42.42, 1234, i)
-		metrics.SendContainerMetric(appId, 1, 11.41, 1234, i)
-		metrics.SendContainerMetric(appId, 2, 11.41, 1234, i)
-		metrics.SendContainerMetric("donotseethis", 2, 11.41, 1234, i)
+		err = metrics.SendContainerMetric(appId, 0, 42.42, 1234, i)
+		if err != nil {
+			println(err.Error())
+		}
+
+		err = metrics.SendContainerMetric(appId, 1, 11.41, 1234, i)
+		if err != nil {
+			println(err.Error())
+		}
+
+		err = metrics.SendContainerMetric(appId, 2, 11.41, 1234, i)
+		if err != nil {
+			println(err.Error())
+		}
+
+		err = metrics.SendContainerMetric("donotseethis", 2, 11.41, 1234, i)
+		if err != nil {
+			println(err.Error())
+		}
+
 		time.Sleep(1 * time.Second)
 	}
 }

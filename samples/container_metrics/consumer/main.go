@@ -16,7 +16,7 @@ var (
 )
 
 func main() {
-	consumer := consumer.New(dopplerAddress, &tls.Config{InsecureSkipVerify: true}, nil)
+	consumer := consumer.New(dopplerAddress, &tls.Config{InsecureSkipVerify: false, MinVersion: tls.VersionTLS12}, nil)
 	consumer.SetDebugPrinter(ConsoleDebugPrinter{})
 
 	fmt.Println("===== Streaming ContainerMetrics (will only succeed if you have admin credentials)")
