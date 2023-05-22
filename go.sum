@@ -2,8 +2,8 @@ github.com/apoydence/eachers v0.0.0-20181020210610-23942921fe77 h1:afT88tB6u9JCK
 github.com/apoydence/eachers v0.0.0-20181020210610-23942921fe77/go.mod h1:bXvGk6IkT1Agy7qzJ+DjIw/SJ1AaB3AvAuMDVV+Vkoo=
 github.com/cloudfoundry-incubator/uaago v0.0.0-20190307164349-8136b7bbe76e h1:DFYA2+zpeaTPEOizAJuaee2O7YX3UP5tOMjkeXL8iLo=
 github.com/cloudfoundry-incubator/uaago v0.0.0-20190307164349-8136b7bbe76e/go.mod h1:8wJCVaTSjT8phXCkbZWAKIB9JU8BEVHbnSbLgkr8WfY=
-github.com/cloudfoundry/dropsonde v1.0.1-0.20220627224009-409b7756c19d h1:FfpliWA97CWywGvMzPXUL7Y9QGFyplrVq3cWR6ITFTQ=
-github.com/cloudfoundry/dropsonde v1.0.1-0.20220627224009-409b7756c19d/go.mod h1:dqmJ2JkWBw1nDVxpq/V5P+cmrRD+GjNJHLfvmhtGbfg=
+github.com/cloudfoundry/dropsonde v1.1.0 h1:nerhj8K0heOsv/U/Ddou5Esw56YlNeHHJH6MP9QlACQ=
+github.com/cloudfoundry/dropsonde v1.1.0/go.mod h1:OrkxsBrAvM8X0Ve9vaSNKLR+/Jeohu3+J0M4JEaTmnM=
 github.com/cloudfoundry/sonde-go v0.0.0-20220627221915-ff36de9c3435 h1:xDsJBppu1bIny3d5CqbOZuCzezFbKhnrmrNucWLpNOk=
 github.com/cloudfoundry/sonde-go v0.0.0-20220627221915-ff36de9c3435/go.mod h1:DX2nqnCgs66F/YWnEtB8EtKWewkiKDu2SRn4y6Ln5NI=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
