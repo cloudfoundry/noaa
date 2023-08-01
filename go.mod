@@ -7,7 +7,7 @@ require (
 	github.com/cloudfoundry-incubator/uaago v0.0.0-20190307164349-8136b7bbe76e
 	github.com/cloudfoundry/dropsonde v1.1.0
 	github.com/cloudfoundry/sonde-go v0.0.0-20220627221915-ff36de9c3435
-	github.com/elazarl/goproxy v0.0.0-20220417044921-416226498f94
+	github.com/elazarl/goproxy v0.0.0-20230731152917-f99041a5c027
 	github.com/elazarl/goproxy/ext v0.0.0-20220417044921-416226498f94
 	github.com/gorilla/websocket v1.5.0
 	github.com/onsi/ginkgo v1.16.5
