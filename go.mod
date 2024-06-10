@@ -9,7 +9,7 @@ require (
 	github.com/cloudfoundry/sonde-go v0.0.0-20230710164515-a0a43d1dbbf8
 	github.com/elazarl/goproxy v0.0.0-20230731152917-f99041a5c027
 	github.com/elazarl/goproxy/ext v0.0.0-20220417044921-416226498f94
-	github.com/gorilla/websocket v1.5.1
+	github.com/gorilla/websocket v1.5.2
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.33.1
 	google.golang.org/protobuf v1.34.1
