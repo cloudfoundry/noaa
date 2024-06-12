@@ -12,7 +12,7 @@ require (
 	github.com/gorilla/websocket v1.5.2
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.33.1
-	google.golang.org/protobuf v1.34.1
+	google.golang.org/protobuf v1.34.2
 )
 
 require (
