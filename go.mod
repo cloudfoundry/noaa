@@ -1,6 +1,6 @@
 module github.com/cloudfoundry/noaa/v2
 
-go 1.21
+go 1.22
 
 require (
 	github.com/apoydence/eachers v0.0.0-20181020210610-23942921fe77
