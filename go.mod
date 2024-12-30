@@ -1,6 +1,7 @@
 module github.com/cloudfoundry/noaa/v2
 
 go 1.22
+toolchain go1.22.5
 
 require (
 	github.com/apoydence/eachers v0.0.0-20181020210610-23942921fe77
@@ -11,8 +12,8 @@ require (
 	github.com/elazarl/goproxy/ext v0.0.0-20220417044921-416226498f94
 	github.com/gorilla/websocket v1.5.3
 	github.com/onsi/ginkgo v1.16.5
-	github.com/onsi/gomega v1.36.1
-	google.golang.org/protobuf v1.36.0
+	github.com/onsi/gomega v1.36.2
+	google.golang.org/protobuf v1.36.1
 )
 
 require (
@@ -24,7 +25,7 @@ require (
 	golang.org/x/net v0.33.0 // indirect
 	golang.org/x/sys v0.28.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
-	golang.org/x/tools v0.24.0 // indirect
+	golang.org/x/tools v0.28.0 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
