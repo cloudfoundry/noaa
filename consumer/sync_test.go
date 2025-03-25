@@ -135,7 +135,7 @@ var _ = Describe("Consumer (Synchronous)", func() {
 
 				It("returns the error", func() {
 					Expect(err).To(HaveOccurred())
-					Expect(err).To(MatchError("Upstream error: an error occurred"))
+					Expect(err).To(MatchError("upstream error: an error occurred"))
 				})
 			})
 		})

@@ -165,7 +165,7 @@ var _ = Describe("Consumer connecting through a Proxy", func() {
 				var err error
 				Eventually(errs).Should(Receive(&err))
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("Error dialing trafficcontroller server"))
+				Expect(err.Error()).To(ContainSubstring("error dialing trafficcontroller server"))
 			})
 		})
 
