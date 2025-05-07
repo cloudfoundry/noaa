@@ -15,7 +15,7 @@ import (
 	"github.com/onsi/gomega/types"
 	"google.golang.org/protobuf/proto"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
@@ -847,7 +847,7 @@ var _ = Describe("Consumer (Asynchronous)", func() {
 				for i := 0; i < 5; i++ {
 					Eventually(errors).Should(Receive(BeRetryable()))
 				}
-			}, 10)
+			})
 		})
 
 		Context("when the connection read takes too long", func() {

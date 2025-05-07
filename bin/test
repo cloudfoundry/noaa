@@ -12,4 +12,5 @@ echo "Go vetting..."
 go vet ./...
 
 echo "Recursive ginkgo... ${*:+(with parameter(s) }$*${*:+)}"
-ginkgo -r --race --randomizeAllSpecs --failOnPending -cover $*
+ACK_GINKGO_DEPRECATIONS=2.23.3 ginkgo -r --race --randomize-all --fail-on-pending -cover $*
+
