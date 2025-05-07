@@ -16,7 +16,9 @@ jobs:
     - uses: actions/setup-go@v5
       with:
         go-version-file: go.mod
-    - run: go run github.com/onsi/ginkgo/ginkgo -r -p -race -randomizeAllSpecs -randomizeSuites
+    - run: go run github.com/onsi/ginkgo/v2/ginkgo -r -p --race --randomize-all --randomize-suites
+      env:
+        ACK_GINKGO_DEPRECATIONS: "2.23.3"
 
   vet:
     runs-on: ubuntu-latest
