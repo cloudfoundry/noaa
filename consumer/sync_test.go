@@ -11,7 +11,7 @@ import (
 	"github.com/cloudfoundry/noaa/v2/test_helpers"
 	"github.com/cloudfoundry/sonde-go/events"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
