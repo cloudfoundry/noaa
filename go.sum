@@ -12,8 +12,8 @@ github.com/coder/websocket v1.8.14 h1:9L0p0iKiNOibykf283eHkKUHHrpG7f65OE3BhhO7v9
 github.com/coder/websocket v1.8.14/go.mod h1:NX3SzP+inril6yawo5CQXx8+fk145lPDC6pumgx0mVg=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/elazarl/goproxy v1.8.1 h1:/qGpPJGgIPOTZ7IoIQvjavocp//qYSe9LQnIGCgRY5k=
-github.com/elazarl/goproxy v1.8.1/go.mod h1:b5xm6W48AUHNpRTCvlnd0YVh+JafCCtsLsJZvvNTz+E=
+github.com/elazarl/goproxy v1.8.2 h1:keGt9KHFAnrXFEctQuOF9NRxKFCXtd5cQg5PrBdeVW4=
+github.com/elazarl/goproxy v1.8.2/go.mod h1:b5xm6W48AUHNpRTCvlnd0YVh+JafCCtsLsJZvvNTz+E=
 github.com/elazarl/goproxy/ext v0.0.0-20220417044921-416226498f94 h1:lTlYurl4RYJaQPm6t0fvJ2v95xGff9mcs0O70iQRFfo=
 github.com/elazarl/goproxy/ext v0.0.0-20220417044921-416226498f94/go.mod h1:gNh8nYJoAm43RfaxurUnxr+N1PwuFV3ZMl/efxlIlY8=
 github.com/fsnotify/fsnotify v1.4.9/go.mod h1:znqG4EE+3YCdAaPaxE2ZRY/06pZUdp0tY4IgpuI1SZQ=
