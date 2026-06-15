@@ -10,7 +10,7 @@ require (
 	github.com/elazarl/goproxy v1.8.4
 	github.com/elazarl/goproxy/ext v0.0.0-20220417044921-416226498f94
 	github.com/gorilla/websocket v1.5.3
-	github.com/onsi/ginkgo/v2 v2.30.0
+	github.com/onsi/ginkgo/v2 v2.31.0
 	github.com/onsi/gomega v1.42.0
 	google.golang.org/protobuf v1.36.11
 )
